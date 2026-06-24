@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS `alone_auth_postaction` (
 CREATE TABLE IF NOT EXISTS `alone_auth_user` (
   `ID` varchar(32) NOT NULL,
   `NAME` varchar(64) NOT NULL,
-  `PASSWORD` varchar(32) NOT NULL COMMENT 'MD5(password+loginname)',
+  `PASSWORD` varchar(128) NOT NULL COMMENT '密码(MD5旧密码或BCrypt新密码)',
   `COMMENTS` varchar(128) DEFAULT NULL,
   `TYPE` char(1) DEFAULT NULL COMMENT '1:系统用户:2其他3超级用户',
   `CTIME` varchar(14) NOT NULL,

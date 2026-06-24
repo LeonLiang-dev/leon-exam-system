@@ -153,7 +153,7 @@ public final class LeonExamLauncher {
         Path appJar = appDir.resolve("app").resolve(APP_JAR_NAME);
         Path mariaDbDir = appDir.resolve("mariadb");
         Path sqlInit = appDir.resolve("sql").resolve("init").resolve("wts.v1.4.1.sql");
-        Path sqlMigration = appDir.resolve("sql").resolve("migrations").resolve("V2_add_point_column.sql");
+        Path sqlMigrationsDir = appDir.resolve("sql").resolve("migrations");
         requireFile(appJar, "后端 JAR");
         requireFile(sqlInit, "初始化 SQL");
         requireFile(mariaDbDir.resolve("bin").resolve(executable("mysqld")), "MariaDB mysqld");
@@ -162,7 +162,7 @@ public final class LeonExamLauncher {
         initDatabaseFiles(mariaDbDir);
         startDatabase(mariaDbDir);
         waitForDatabase(mariaDbDir);
-        initializeSchemaIfNeeded(mariaDbDir, sqlInit, sqlMigration);
+        initializeSchemaIfNeeded(mariaDbDir, sqlInit, sqlMigrationsDir);
 
         Path configFile = writeApplicationConfig();
         startServer(appJar, configFile);
@@ -301,25 +301,64 @@ public final class LeonExamLauncher {
         throw new IllegalStateException("MariaDB 启动超时");
     }
 
-    private void initializeSchemaIfNeeded(Path mariaDbDir, Path sqlInit, Path sqlMigration)
+    private void initializeSchemaIfNeeded(Path mariaDbDir, Path sqlInit, Path sqlMigrationsDir)
             throws IOException, InterruptedException {
         Path marker = dataRoot.resolve(".db-initialized");
-        if (Files.exists(marker)) {
-            appendLog("数据库已初始化，跳过 SQL 导入。");
-            return;
-        }
         appendLog("正在创建数据库 wts...");
         runMysql(mariaDbDir, null, List.of("-e",
                 "CREATE DATABASE IF NOT EXISTS wts DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"), null);
 
-        appendLog("正在导入初始化 SQL，可能需要数分钟...");
-        runMysql(mariaDbDir, "wts", List.of("--default-character-set=utf8mb4"), sqlInit);
-        if (Files.exists(sqlMigration)) {
-            appendLog("正在执行增量迁移 SQL...");
-            runMysql(mariaDbDir, "wts", List.of("--default-character-set=utf8mb4"), sqlMigration);
+        if (Files.exists(marker)) {
+            appendLog("数据库已初始化，检查增量迁移。");
+        } else {
+            appendLog("正在导入初始化 SQL，可能需要数分钟...");
+            runMysql(mariaDbDir, "wts", List.of("--default-character-set=utf8mb4"), sqlInit);
+            Files.writeString(marker, "initialized", StandardCharsets.UTF_8);
+            appendLog("数据库基础结构初始化完成。");
         }
-        Files.writeString(marker, "initialized", StandardCharsets.UTF_8);
+        runPendingMigrations(mariaDbDir, sqlMigrationsDir);
         appendLog("数据库初始化完成。");
+    }
+
+    private void runPendingMigrations(Path mariaDbDir, Path sqlMigrationsDir)
+            throws IOException, InterruptedException {
+        if (!Files.isDirectory(sqlMigrationsDir)) {
+            appendLog("未发现增量迁移目录，跳过。");
+            return;
+        }
+
+        List<Path> migrations;
+        try (Stream<Path> paths = Files.list(sqlMigrationsDir)) {
+            migrations = paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".sql"))
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .toList();
+        }
+
+        if (migrations.isEmpty()) {
+            appendLog("未发现增量迁移 SQL。");
+            return;
+        }
+
+        Path markerDir = dataRoot.resolve(".migrations");
+        Files.createDirectories(markerDir);
+        boolean executed = false;
+        for (Path migration : migrations) {
+            String fileName = migration.getFileName().toString();
+            Path migrationMarker = markerDir.resolve(fileName + ".applied");
+            if (Files.exists(migrationMarker)) {
+                continue;
+            }
+            appendLog("正在执行增量迁移 SQL: " + fileName);
+            runMysql(mariaDbDir, "wts", List.of("--default-character-set=utf8mb4"), migration);
+            Files.writeString(migrationMarker, "applied", StandardCharsets.UTF_8);
+            executed = true;
+        }
+
+        if (!executed) {
+            appendLog("没有待执行的增量迁移。");
+        }
     }
 
     private Path writeApplicationConfig() throws IOException {
