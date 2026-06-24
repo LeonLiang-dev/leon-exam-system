@@ -361,9 +361,10 @@ public final class LeonExamLauncher {
             return;
         }
         appendLog("正在启动后端服务...");
-        String javaExe = Paths.get(System.getProperty("java.home"), "bin", executable("java")).toString();
+        Path javaExe = resolveJavaExecutable();
+        appendLog("Java 运行时: " + javaExe);
         List<String> command = List.of(
-                javaExe,
+                javaExe.toString(),
                 "-jar",
                 appJar.toString(),
                 "--spring.profiles.active=prod",
@@ -374,6 +375,27 @@ public final class LeonExamLauncher {
                 .redirectErrorStream(true)
                 .start();
         pipeLogs(serverProcess, "server");
+    }
+
+    private Path resolveJavaExecutable() {
+        List<Path> candidates = new ArrayList<>();
+        String javaHome = System.getProperty("java.home");
+        if (javaHome != null && !javaHome.isBlank()) {
+            candidates.add(Paths.get(javaHome, "bin", executable("java")));
+        }
+
+        Path installRoot = appDir.getParent();
+        if (installRoot != null) {
+            candidates.add(installRoot.resolve("runtime").resolve("bin").resolve(executable("java")));
+        }
+        candidates.add(appDir.resolve("jre").resolve("bin").resolve(executable("java")));
+
+        for (Path candidate : candidates) {
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+        return Paths.get(executable("java"));
     }
 
     private void waitForServer() throws Exception {

@@ -21,6 +21,7 @@ set "LAUNCHER_JAR=%LAUNCHER_DIR%\target\leon-exam-launcher-2.0.0.jar"
 set "DIST_DIR=%PROJECT_DIR%dist"
 set "JPACKAGE_DIR=%DIST_DIR%\jpackage"
 set "PAYLOAD_DIR=%DIST_DIR%\windows-payload"
+set "RUNTIME_DIR=%DIST_DIR%\runtime-image"
 set "PACKAGE_MODE=0"
 
 echo ==========================================
@@ -141,6 +142,7 @@ if not exist "%LAUNCHER_JAR%" (
 
 if exist "%PAYLOAD_DIR%" rmdir /s /q "%PAYLOAD_DIR%"
 if exist "%JPACKAGE_DIR%" rmdir /s /q "%JPACKAGE_DIR%"
+if exist "%RUNTIME_DIR%" rmdir /s /q "%RUNTIME_DIR%"
 mkdir "%PAYLOAD_DIR%\app" || exit /b 1
 mkdir "%PAYLOAD_DIR%\sql" || exit /b 1
 
@@ -154,18 +156,36 @@ xcopy /e /i /q "%MARIADB_SOURCE_DIR%" "%PAYLOAD_DIR%\mariadb" >nul
 if errorlevel 1 exit /b 1
 mkdir "%JPACKAGE_DIR%" || exit /b 1
 
+echo.
+echo [package] Building runtime image with java launcher...
+jlink ^
+    --add-modules ALL-MODULE-PATH ^
+    --no-header-files ^
+    --no-man-pages ^
+    --compress=2 ^
+    --output "%RUNTIME_DIR%"
+if errorlevel 1 (
+    echo ERROR: jlink runtime image failed.
+    exit /b 1
+)
+if not exist "%RUNTIME_DIR%\bin\java.exe" (
+    echo ERROR: Runtime image does not contain java.exe: "%RUNTIME_DIR%\bin\java.exe"
+    exit /b 1
+)
+
 jpackage ^
     --name LeonExam ^
     --type exe ^
     --dest "%JPACKAGE_DIR%" ^
     --input "%PAYLOAD_DIR%" ^
+    --runtime-image "%RUNTIME_DIR%" ^
     --main-jar launcher.jar ^
     --main-class com.wts.launcher.LeonExamLauncher ^
     --java-options "-Dfile.encoding=UTF-8" ^
     --win-dir-chooser ^
     --win-shortcut ^
     --win-menu ^
-    --app-version 2.0.1 ^
+    --app-version 2.0.2 ^
     --description "Leon Exam System" ^
     --vendor "Leon"
 if errorlevel 1 (
@@ -195,6 +215,12 @@ if errorlevel 1 (
 where jpackage >nul 2>nul
 if errorlevel 1 (
     echo ERROR: jpackage not found. Use a full JDK 17+ on the Windows build machine.
+    exit /b 1
+)
+
+where jlink >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: jlink not found. Use a full JDK 17+ on the Windows build machine.
     exit /b 1
 )
 
