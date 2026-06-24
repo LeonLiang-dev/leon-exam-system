@@ -1,4 +1,4 @@
-# Leon 在线考试系统 / Nemotion
+# Leon 在线考试系统
 
 基于 Spring Boot 3、React 18、UmiJS 4 和 Ant Design 5 重构升级的在线考试系统，面向教师机本地部署、局域网学生访问的教学考试场景。
 
