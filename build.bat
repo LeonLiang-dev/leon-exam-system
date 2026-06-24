@@ -23,6 +23,8 @@ set "JPACKAGE_DIR=%DIST_DIR%\jpackage"
 set "PAYLOAD_DIR=%DIST_DIR%\windows-payload"
 set "RUNTIME_DIR=%DIST_DIR%\runtime-image"
 set "PACKAGE_MODE=0"
+set "APP_VERSION=2.0.3"
+set "WIN_UPGRADE_UUID=B7049603-F325-4AC9-B9E2-46CA1AA46E95"
 
 echo ==========================================
 echo   Leon Exam System Build
@@ -185,7 +187,8 @@ jpackage ^
     --win-dir-chooser ^
     --win-shortcut ^
     --win-menu ^
-    --app-version 2.0.2 ^
+    --win-upgrade-uuid "%WIN_UPGRADE_UUID%" ^
+    --app-version "%APP_VERSION%" ^
     --description "Leon Exam System" ^
     --vendor "Leon"
 if errorlevel 1 (

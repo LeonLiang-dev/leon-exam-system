@@ -3,6 +3,7 @@ package com.wts.launcher;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -15,6 +16,8 @@ import java.awt.GridLayout;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -25,7 +28,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -68,16 +73,53 @@ public final class LeonExamLauncher {
     }
 
     public static void main(String[] args) {
+        Thread.setDefaultUncaughtExceptionHandler((thread, error) -> writeStartupError(error));
         SwingUtilities.invokeLater(() -> {
             try {
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (Exception ignored) {
-                // Keep default Swing look and feel.
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (Exception ignored) {
+                    // Keep default Swing look and feel.
+                }
+                LeonExamLauncher launcher = new LeonExamLauncher();
+                launcher.frame.setVisible(true);
+                launcher.startAsync();
+            } catch (Throwable error) {
+                writeStartupError(error);
+                showStartupError(error);
+                System.exit(1);
             }
-            LeonExamLauncher launcher = new LeonExamLauncher();
-            launcher.frame.setVisible(true);
-            launcher.startAsync();
         });
+    }
+
+    private static void writeStartupError(Throwable error) {
+        try {
+            Path logFile = resolveDataRoot().resolve("logs").resolve("launcher-startup.log");
+            Files.createDirectories(logFile.getParent());
+            StringWriter stack = new StringWriter();
+            error.printStackTrace(new PrintWriter(stack));
+            String content = """
+                    [%s] Launcher startup failed
+                    %s
+
+                    """.formatted(LocalDateTime.now(), stack);
+            Files.writeString(logFile, content, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (Exception ignored) {
+            // The process may fail before the data directory is writable.
+        }
+    }
+
+    private static void showStartupError(Throwable error) {
+        try {
+            JOptionPane.showMessageDialog(null,
+                    "启动器启动失败，请查看 C:\\ProgramData\\LeonExam\\logs\\launcher-startup.log\n\n"
+                            + error.getMessage(),
+                    "Leon在线考试系统",
+                    JOptionPane.ERROR_MESSAGE);
+        } catch (Exception ignored) {
+            // Headless or UI initialization failure.
+        }
     }
 
     private void initUi() {
