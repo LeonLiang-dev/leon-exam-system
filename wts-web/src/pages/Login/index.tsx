@@ -28,9 +28,9 @@ const LoginPage: React.FC = () => {
     <div className="wts-login-page">
       <section className="wts-login-identity">
         <div>
-          <div className="wts-login-brand">W</div>
+          <div className="wts-login-brand">L</div>
           <div className="wts-login-copy">
-            <h1>WTS 在线考试系统</h1>
+            <h1>Leon 在线考试系统</h1>
             <p>面向教师、管理员和学生的考试组织平台，支持题库维护、试卷配置、答题室发布和在线答题。</p>
           </div>
           <div className="wts-login-points">
@@ -103,7 +103,7 @@ const LoginPage: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
-          <div style={{ textAlign: 'center', marginTop: 16, color: '#94a3b8', fontSize: 12 }}>WTS v2.0 · 安全登录</div>
+          <div style={{ textAlign: 'center', marginTop: 16, color: '#94a3b8', fontSize: 12 }}>Leon v2.0 · 安全登录</div>
       </Card>
       </main>
     </div>

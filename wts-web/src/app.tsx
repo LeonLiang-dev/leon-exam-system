@@ -30,8 +30,8 @@ export const getInitialState = async (): Promise<{
 // 布局配置
 export const layout: RunTimeLayoutConfig = ({ initialState }) => {
   return {
-    title: 'WTS 在线考试',
-    logo: <div className="wts-brand-logo">W</div>,
+    title: 'Leon 在线考试',
+    logo: <div className="wts-brand-logo">L</div>,
     menu: { locale: false },
     fixedHeader: true,
     fixSiderbar: true,
