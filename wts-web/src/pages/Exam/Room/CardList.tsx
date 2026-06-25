@@ -1,9 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useParams, history } from '@umijs/max';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
-import { Button, message, Tag, Popconfirm, Space } from 'antd';
-import { ReloadOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { getRoomCards, judgeCard } from '@/services/exam';
+import { Button, message, Modal, Tag, Space } from 'antd';
+import { CheckCircleOutlined, ReloadOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { getRoomCards, batchJudgeCards } from '@/services/exam';
 
 const PSTATE_MAP: Record<string, { text: string; color: string }> = {
   '11': { text: '答题中', color: 'blue' },
@@ -14,6 +14,40 @@ const PSTATE_MAP: Record<string, { text: string; color: string }> = {
 const CardListPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const actionRef = useRef<ActionType>();
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [selectedRows, setSelectedRows] = useState<any[]>([]);
+  const [batchJudging, setBatchJudging] = useState(false);
+
+  const handleBatchJudge = () => {
+    if (selectedRows.length === 0) {
+      message.warning('请先选择答卷');
+      return;
+    }
+    const invalidRows = selectedRows.filter((card) => card.pstate !== '16');
+    if (invalidRows.length > 0) {
+      message.warning('只能批量阅卷已提交的答卷');
+      return;
+    }
+    const ids = selectedRows.map((card) => card.id);
+    Modal.confirm({
+      title: `确定批量阅卷选中的 ${ids.length} 份答卷？`,
+      content: '批量阅卷会按当前自动得分结果标记为已阅卷。',
+      okText: '阅卷',
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchJudging(true);
+        try {
+          await batchJudgeCards(ids);
+          message.success('批量阅卷成功');
+          setSelectedRowKeys([]);
+          setSelectedRows([]);
+          actionRef.current?.reload();
+        } finally {
+          setBatchJudging(false);
+        }
+      },
+    });
+  };
 
   const columns: ProColumns[] = [
     {
@@ -93,6 +127,15 @@ const CardListPage: React.FC = () => {
         search={false}
         toolBarRender={() => [
           <Button
+            key="batch-judge"
+            icon={<CheckCircleOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchJudging}
+            onClick={handleBatchJudge}
+          >
+            批量阅卷
+          </Button>,
+          <Button
             key="reload"
             icon={<ReloadOutlined />}
             onClick={() => actionRef.current?.reload()}
@@ -110,6 +153,13 @@ const CardListPage: React.FC = () => {
             total: res.data?.total || 0,
             success: true,
           };
+        }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys, rows) => {
+            setSelectedRowKeys(keys);
+            setSelectedRows(rows);
+          },
         }}
         columns={columns}
       />

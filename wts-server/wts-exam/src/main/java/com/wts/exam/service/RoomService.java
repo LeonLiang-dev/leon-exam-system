@@ -15,8 +15,11 @@ public interface RoomService {
     ExamRoom create(RoomDTO dto, String operatorId, String operatorName);
     ExamRoom update(String id, RoomDTO dto, String operatorId);
     void delete(String id, String operatorId);
+    void deleteBatch(List<String> ids, String operatorId);
     void publish(String id, String operatorId);
+    void publishBatch(List<String> ids, String operatorId);
     void close(String id, String operatorId);
+    void closeBatch(List<String> ids, String operatorId);
     void addPaper(String roomId, String paperId, String name, Float passPoint);
     void removePaper(String roomId, String paperId);
     List<ExamRoomPaper> getRoomPapers(String roomId);

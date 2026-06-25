@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Tree, Button, Modal, Form, Input, InputNumber, message, Space, Popconfirm, Empty, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { getSubjectTypeTree, createSubjectType, updateSubjectType, deleteSubjectType } from '@/services/exam';
+import {
+  getSubjectTypeTree,
+  createSubjectType,
+  updateSubjectType,
+  deleteSubjectType,
+  batchDeleteSubjectTypes,
+} from '@/services/exam';
 
 const SubjectTypePage: React.FC = () => {
   const [treeData, setTreeData] = useState<any[]>([]);
@@ -9,12 +15,16 @@ const SubjectTypePage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
   const [parentId, setParentId] = useState<string | null>(null);
+  const [checkedTypeKeys, setCheckedTypeKeys] = useState<string[]>([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
   const [form] = Form.useForm();
 
   const loadTree = async () => {
     try {
+      setLoading(true);
       const res: any = await getSubjectTypeTree();
       setTreeData(res.data || []);
+      setCheckedTypeKeys([]);
     } catch {
       message.error('加载分类失败');
     } finally {
@@ -80,12 +90,45 @@ const SubjectTypePage: React.FC = () => {
     }
   };
 
+  const handleBatchDelete = () => {
+    if (checkedTypeKeys.length === 0) {
+      message.warning('请先选择分类');
+      return;
+    }
+    Modal.confirm({
+      title: `确定删除选中的 ${checkedTypeKeys.length} 个分类？`,
+      content: '删除分类会让该分类从题目分类树中隐藏。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchDeleting(true);
+        try {
+          await batchDeleteSubjectTypes(checkedTypeKeys);
+          message.success('批量删除成功');
+          loadTree();
+        } finally {
+          setBatchDeleting(false);
+        }
+      },
+    });
+  };
+
   return (
     <div>
       <Card
         title="题目分类管理"
         extra={
           <Space>
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              disabled={checkedTypeKeys.length === 0}
+              loading={batchDeleting}
+              onClick={handleBatchDelete}
+            >
+              批量删除
+            </Button>
             <Button
               icon={<PlusOutlined />}
               type="primary"
@@ -105,8 +148,14 @@ const SubjectTypePage: React.FC = () => {
           <Empty description="暂无分类，点击上方按钮新建" />
         ) : (
           <Tree
+            checkable
             showLine
             defaultExpandAll
+            checkedKeys={checkedTypeKeys}
+            onCheck={(keys) => {
+              const nextKeys = Array.isArray(keys) ? keys : keys.checked;
+              setCheckedTypeKeys(nextKeys.map(String));
+            }}
             treeData={convertToTreeData(treeData)}
           />
         )}

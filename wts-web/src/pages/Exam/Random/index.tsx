@@ -5,8 +5,8 @@ import {
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, ThunderboltOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
-  getRandomItems, createRandomItem, deleteRandomItem,
-  getRandomSteps, addRandomStep, deleteRandomStep, generatePapers,
+  getRandomItems, createRandomItem, deleteRandomItem, batchDeleteRandomItems,
+  getRandomSteps, addRandomStep, deleteRandomStep, batchDeleteRandomSteps, generatePapers,
 } from '@/services/exam';
 
 const TIPTYPE_OPTIONS = [
@@ -28,11 +28,16 @@ const RandomPage: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [steps, setSteps] = useState<any[]>([]);
   const [generateCount, setGenerateCount] = useState(1);
+  const [selectedItemKeys, setSelectedItemKeys] = useState<React.Key[]>([]);
+  const [selectedStepKeys, setSelectedStepKeys] = useState<React.Key[]>([]);
+  const [batchDeletingItems, setBatchDeletingItems] = useState(false);
+  const [batchDeletingSteps, setBatchDeletingSteps] = useState(false);
 
   const loadSteps = async (itemId: string) => {
     try {
       const res: any = await getRandomSteps(itemId);
       setSteps(res.data || []);
+      setSelectedStepKeys([]);
     } catch {
       setSteps([]);
     }
@@ -56,7 +61,7 @@ const RandomPage: React.FC = () => {
       width: 250,
       render: (_, record) => (
         <Space>
-          <a onClick={() => { setSelectedItem(record); }}>查看步骤</a>
+          <a onClick={() => { setSelectedItem(record); setSelectedStepKeys([]); }}>查看步骤</a>
           <a
             style={{ color: '#52c41a' }}
             onClick={() => { setSelectedItem(record); setGenerateModalOpen(true); }}
@@ -143,6 +148,65 @@ const RandomPage: React.FC = () => {
     }
   };
 
+  const handleBatchDeleteItems = () => {
+    const ids = selectedItemKeys.map(String);
+    if (ids.length === 0) {
+      message.warning('请先选择随机规则');
+      return;
+    }
+    Modal.confirm({
+      title: `确定删除选中的 ${ids.length} 个随机规则？`,
+      content: '删除随机规则会同时删除其规则步骤。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchDeletingItems(true);
+        try {
+          await batchDeleteRandomItems(ids);
+          message.success('批量删除成功');
+          setSelectedItemKeys([]);
+          if (selectedItem && ids.includes(selectedItem.id)) {
+            setSelectedItem(null);
+            setSteps([]);
+          }
+          actionRef.current?.reload();
+        } finally {
+          setBatchDeletingItems(false);
+        }
+      },
+    });
+  };
+
+  const handleBatchDeleteSteps = () => {
+    const ids = selectedStepKeys.map(String);
+    if (!selectedItem) {
+      message.warning('请先选择随机规则');
+      return;
+    }
+    if (ids.length === 0) {
+      message.warning('请先选择规则步骤');
+      return;
+    }
+    Modal.confirm({
+      title: `确定删除选中的 ${ids.length} 个规则步骤？`,
+      content: '删除后该随机规则生成试卷时不会再使用这些步骤。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchDeletingSteps(true);
+        try {
+          await batchDeleteRandomSteps(ids);
+          message.success('批量删除成功');
+          loadSteps(selectedItem.id);
+        } finally {
+          setBatchDeletingSteps(false);
+        }
+      },
+    });
+  };
+
   return (
     <Row gutter={16}>
       <Col xs={24} md={10}>
@@ -152,6 +216,16 @@ const RandomPage: React.FC = () => {
             rowKey="id"
             search={false}
             toolBarRender={() => [
+              <Button
+                key="batch-delete"
+                danger
+                icon={<DeleteOutlined />}
+                disabled={selectedItemKeys.length === 0}
+                loading={batchDeletingItems}
+                onClick={handleBatchDeleteItems}
+              >
+                批量删除
+              </Button>,
               <Button
                 key="add"
                 type="primary"
@@ -168,6 +242,10 @@ const RandomPage: React.FC = () => {
             columns={columns}
             size="small"
             pagination={false}
+            rowSelection={{
+              selectedRowKeys: selectedItemKeys,
+              onChange: setSelectedItemKeys,
+            }}
             rowClassName={(record) => record.id === selectedItem?.id ? 'ant-table-row-selected' : ''}
           />
         </Card>
@@ -177,18 +255,30 @@ const RandomPage: React.FC = () => {
           title={selectedItem ? `${selectedItem.name} — 规则步骤` : '请从左侧选择规则'}
           size="small"
           extra={selectedItem && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              size="small"
-              onClick={() => {
-                stepForm.resetFields();
-                stepForm.setFieldsValue({ sort: steps.length + 1, subnum: 5, subpoint: 2 });
-                setStepModalOpen(true);
-              }}
-            >
-              添加步骤
-            </Button>
+            <Space>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                disabled={selectedStepKeys.length === 0}
+                loading={batchDeletingSteps}
+                onClick={handleBatchDeleteSteps}
+              >
+                批量删除
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                size="small"
+                onClick={() => {
+                  stepForm.resetFields();
+                  stepForm.setFieldsValue({ sort: steps.length + 1, subnum: 5, subpoint: 2 });
+                  setStepModalOpen(true);
+                }}
+              >
+                添加步骤
+              </Button>
+            </Space>
           )}
         >
           <Table
@@ -197,6 +287,10 @@ const RandomPage: React.FC = () => {
             rowKey="id"
             size="small"
             pagination={false}
+            rowSelection={{
+              selectedRowKeys: selectedStepKeys,
+              onChange: setSelectedStepKeys,
+            }}
           />
         </Card>
       </Col>

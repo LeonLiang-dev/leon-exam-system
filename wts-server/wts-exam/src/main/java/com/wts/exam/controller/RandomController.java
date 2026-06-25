@@ -3,6 +3,7 @@ package com.wts.exam.controller;
 import com.wts.common.result.R;
 import com.wts.common.security.CurrentUser;
 import com.wts.common.security.CurrentUserProvider;
+import com.wts.exam.dto.BatchIdsDTO;
 import com.wts.exam.dto.RandomItemDTO;
 import com.wts.exam.service.RandomService;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,14 @@ public class RandomController {
         return R.ok();
     }
 
+    @PostMapping("/random-items/batch-delete")
+    public R<?> batchDeleteItems(@RequestBody BatchIdsDTO dto) {
+        CurrentUser user = currentUserProvider.require();
+        requireAdmin(user);
+        service.deleteItemsBatch(dto.normalizedIds());
+        return R.ok();
+    }
+
     @GetMapping("/random-items/{itemId}/steps")
     public R<?> getSteps(@PathVariable String itemId) {
         return R.ok(service.getSteps(itemId));
@@ -66,6 +75,14 @@ public class RandomController {
         CurrentUser user = currentUserProvider.require();
         requireAdmin(user);
         service.deleteStep(id);
+        return R.ok();
+    }
+
+    @PostMapping("/random-steps/batch-delete")
+    public R<?> batchDeleteSteps(@RequestBody BatchIdsDTO dto) {
+        CurrentUser user = currentUserProvider.require();
+        requireAdmin(user);
+        service.deleteStepsBatch(dto.normalizedIds());
         return R.ok();
     }
 

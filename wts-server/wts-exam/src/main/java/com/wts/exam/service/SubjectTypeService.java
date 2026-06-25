@@ -8,4 +8,5 @@ public interface SubjectTypeService {
     ExamSubjectType create(ExamSubjectType type, String operatorId);
     ExamSubjectType update(String id, ExamSubjectType type, String operatorId);
     void delete(String id, String operatorId);
+    void deleteBatch(List<String> ids, String operatorId);
 }

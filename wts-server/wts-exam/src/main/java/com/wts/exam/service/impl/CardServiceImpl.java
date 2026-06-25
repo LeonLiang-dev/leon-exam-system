@@ -240,6 +240,17 @@ public class CardServiceImpl implements CardService {
         cardMapper.updateById(card);
     }
 
+    @Override
+    @Transactional
+    public void judgeBatch(List<String> cardIds, String judgeUserId, String judgeUserName) {
+        if (cardIds == null || cardIds.isEmpty()) {
+            throw BizException.fail("请选择要阅卷的答卷");
+        }
+        for (String cardId : cardIds) {
+            judge(cardId, null, judgeUserId, judgeUserName);
+        }
+    }
+
     private void autoGrade(ExamCard card) {
         // Delete existing points to prevent duplicates
         cardPointMapper.delete(

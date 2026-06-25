@@ -4,6 +4,7 @@ import com.wts.common.exception.BizException;
 import com.wts.common.result.R;
 import com.wts.common.security.CurrentUser;
 import com.wts.common.security.CurrentUserProvider;
+import com.wts.exam.dto.BatchIdsDTO;
 import com.wts.exam.dto.RoomDTO;
 import com.wts.exam.service.RoomService;
 import lombok.RequiredArgsConstructor;
@@ -67,11 +68,27 @@ public class RoomController {
         return R.ok();
     }
 
+    @PostMapping("/batch-publish")
+    public R<?> batchPublish(@RequestBody BatchIdsDTO dto) {
+        CurrentUser user = currentUserProvider.require();
+        requireAdmin(user);
+        service.publishBatch(dto.normalizedIds(), user.id());
+        return R.ok();
+    }
+
     @PostMapping("/{id}/close")
     public R<?> close(@PathVariable String id) {
         CurrentUser user = currentUserProvider.require();
         requireAdmin(user);
         service.close(id, user.id());
+        return R.ok();
+    }
+
+    @PostMapping("/batch-close")
+    public R<?> batchClose(@RequestBody BatchIdsDTO dto) {
+        CurrentUser user = currentUserProvider.require();
+        requireAdmin(user);
+        service.closeBatch(dto.normalizedIds(), user.id());
         return R.ok();
     }
 
@@ -113,6 +130,14 @@ public class RoomController {
         CurrentUser user = currentUserProvider.require();
         requireAdmin(user);
         service.delete(id, user.id());
+        return R.ok();
+    }
+
+    @PostMapping("/batch-delete")
+    public R<?> batchDelete(@RequestBody BatchIdsDTO dto) {
+        CurrentUser user = currentUserProvider.require();
+        requireAdmin(user);
+        service.deleteBatch(dto.normalizedIds(), user.id());
         return R.ok();
     }
 

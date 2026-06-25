@@ -64,6 +64,17 @@ public class RandomServiceImpl implements RandomService {
     }
 
     @Override
+    @Transactional
+    public void deleteItemsBatch(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要删除的随机规则");
+        }
+        for (String id : ids) {
+            deleteItem(id);
+        }
+    }
+
+    @Override
     public List<ExamRandomStep> getSteps(String itemId) {
         return stepMapper.selectList(
                 new LambdaQueryWrapper<ExamRandomStep>()
@@ -108,6 +119,17 @@ public class RandomServiceImpl implements RandomService {
     @Transactional
     public void deleteStep(String id) {
         stepMapper.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public void deleteStepsBatch(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要删除的规则步骤");
+        }
+        for (String id : ids) {
+            deleteStep(id);
+        }
     }
 
     @Override

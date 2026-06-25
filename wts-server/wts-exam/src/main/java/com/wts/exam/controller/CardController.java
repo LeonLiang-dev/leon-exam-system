@@ -4,6 +4,7 @@ import com.wts.common.exception.BizException;
 import com.wts.common.result.R;
 import com.wts.common.security.CurrentUser;
 import com.wts.common.security.CurrentUserProvider;
+import com.wts.exam.dto.BatchIdsDTO;
 import com.wts.exam.dto.CardSubmitDTO;
 import com.wts.exam.dto.JudgeDTO;
 import com.wts.exam.entity.ExamCard;
@@ -58,6 +59,14 @@ public class CardController {
         CurrentUser user = currentUserProvider.require();
         requireAdmin(user);
         service.judge(id, dto, user.id(), user.displayName());
+        return R.ok();
+    }
+
+    @PostMapping("/batch-judge")
+    public R<?> batchJudge(@RequestBody BatchIdsDTO dto) {
+        CurrentUser user = currentUserProvider.require();
+        requireAdmin(user);
+        service.judgeBatch(dto.normalizedIds(), user.id(), user.displayName());
         return R.ok();
     }
 

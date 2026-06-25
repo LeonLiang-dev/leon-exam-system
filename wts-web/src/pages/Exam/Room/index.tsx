@@ -5,7 +5,7 @@ import {
   Button, message, Modal, Form, Input, InputNumber, Select, Popconfirm, Space, Tag, DatePicker,
 } from 'antd';
 import dayjs from 'dayjs';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, ReloadOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
 import { getUsers } from '@/services/system';
 import { formatExamDateTime } from '@/utils/examTime';
 import {
@@ -13,8 +13,11 @@ import {
   createRoom,
   updateRoom,
   deleteRoom,
+  batchDeleteRooms,
   publishRoom,
+  batchPublishRooms,
   closeRoom,
+  batchCloseRooms,
   enterRoom,
   getRoomPapers,
   addRoomPaper,
@@ -76,6 +79,100 @@ const RoomPage: React.FC = () => {
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [userModalLoading, setUserModalLoading] = useState(false);
   const [savingUsers, setSavingUsers] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [selectedRows, setSelectedRows] = useState<any[]>([]);
+  const [batchOperating, setBatchOperating] = useState(false);
+
+  const clearSelection = () => {
+    setSelectedRowKeys([]);
+    setSelectedRows([]);
+  };
+
+  const getSelectedRoomIdsByState = (state: string, actionName: string) => {
+    if (selectedRows.length === 0) {
+      message.warning('请先选择答题室');
+      return null;
+    }
+    const invalidRows = selectedRows.filter((room) => room.pstate !== state);
+    if (invalidRows.length > 0) {
+      message.warning(`只能${actionName}${PSTATE_MAP[state]?.text || '指定状态'}的答题室`);
+      return null;
+    }
+    return selectedRows.map((room) => room.id);
+  };
+
+  const handleBatchPublish = () => {
+    const ids = getSelectedRoomIdsByState('11', '发布');
+    if (!ids) return;
+    const invalidRoom = selectedRows.find((room) => getPublishValidationMessage(room));
+    if (invalidRoom) {
+      message.warning(`${invalidRoom.name || '答题室'}：${getPublishValidationMessage(invalidRoom)}`);
+      return;
+    }
+    Modal.confirm({
+      title: `确定发布选中的 ${ids.length} 个答题室？`,
+      content: '发布后学生将可以看到符合参与范围的答题室。',
+      okText: '发布',
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchOperating(true);
+        try {
+          await batchPublishRooms(ids);
+          message.success('批量发布成功');
+          clearSelection();
+          actionRef.current?.reload();
+        } finally {
+          setBatchOperating(false);
+        }
+      },
+    });
+  };
+
+  const handleBatchClose = () => {
+    const ids = getSelectedRoomIdsByState('21', '关闭');
+    if (!ids) return;
+    Modal.confirm({
+      title: `确定关闭选中的 ${ids.length} 个答题室？`,
+      content: '关闭后学生不能继续进入这些答题室。',
+      okText: '关闭',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchOperating(true);
+        try {
+          await batchCloseRooms(ids);
+          message.success('批量关闭成功');
+          clearSelection();
+          actionRef.current?.reload();
+        } finally {
+          setBatchOperating(false);
+        }
+      },
+    });
+  };
+
+  const handleBatchDelete = () => {
+    const ids = getSelectedRoomIdsByState('11', '删除');
+    if (!ids) return;
+    Modal.confirm({
+      title: `确定删除选中的 ${ids.length} 个答题室？`,
+      content: '删除答题室会同时移除试卷和参与人员关联。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchOperating(true);
+        try {
+          await batchDeleteRooms(ids);
+          message.success('批量删除成功');
+          clearSelection();
+          actionRef.current?.reload();
+        } finally {
+          setBatchOperating(false);
+        }
+      },
+    });
+  };
 
   const openUserModal = async (room: any) => {
     setManagingUserRoom(room);
@@ -352,6 +449,34 @@ const RoomPage: React.FC = () => {
           >
             刷新
           </Button>,
+          <Button
+            key="batch-publish"
+            icon={<SendOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchOperating}
+            onClick={handleBatchPublish}
+          >
+            批量发布
+          </Button>,
+          <Button
+            key="batch-close"
+            icon={<StopOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchOperating}
+            onClick={handleBatchClose}
+          >
+            批量关闭
+          </Button>,
+          <Button
+            key="batch-delete"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchOperating}
+            onClick={handleBatchDelete}
+          >
+            批量删除
+          </Button>,
         ]}
         request={async (params) => {
           const res: any = await getRooms({
@@ -365,6 +490,13 @@ const RoomPage: React.FC = () => {
             total: res.data?.total || 0,
             success: true,
           };
+        }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys, rows) => {
+            setSelectedRowKeys(keys);
+            setSelectedRows(rows);
+          },
         }}
         columns={columns}
       />

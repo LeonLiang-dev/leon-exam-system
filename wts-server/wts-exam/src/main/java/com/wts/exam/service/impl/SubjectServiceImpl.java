@@ -189,6 +189,17 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    @Transactional
+    public void deleteBatch(List<String> ids, String operatorId) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要删除的题目");
+        }
+        for (String id : ids) {
+            delete(id, operatorId);
+        }
+    }
+
+    @Override
     public ExamSubjectVersion getCurrentVersion(String subjectId) {
         ExamSubject subject = subjectMapper.selectById(subjectId);
         if (subject == null) throw BizException.notFound("题目");

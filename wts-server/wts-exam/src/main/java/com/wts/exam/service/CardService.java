@@ -19,6 +19,7 @@ public interface CardService {
     List<ExamCardAnswer> getCardAnswers(String cardId);
     List<ExamCardPoint> getCardPoints(String cardId);
     void judge(String cardId, JudgeDTO dto, String judgeUserId, String judgeUserName);
+    void judgeBatch(List<String> cardIds, String judgeUserId, String judgeUserName);
     ExamPaperVO getExamPaper(String cardId, String userId);
     ExamPaperVO getExamPaperForReview(String cardId);
     PageResult<ExamCard> getRoomCards(String roomId, int page, int size);

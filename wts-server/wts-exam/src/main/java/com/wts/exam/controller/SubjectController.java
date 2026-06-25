@@ -3,6 +3,7 @@ package com.wts.exam.controller;
 import com.wts.common.result.R;
 import com.wts.common.security.CurrentUser;
 import com.wts.common.security.CurrentUserProvider;
+import com.wts.exam.dto.BatchIdsDTO;
 import com.wts.exam.dto.SubjectDTO;
 import com.wts.exam.dto.SubjectQueryDTO;
 import com.wts.exam.service.SubjectImportService;
@@ -60,6 +61,14 @@ public class SubjectController {
         CurrentUser user = currentUserProvider.require();
         requireAdmin(user);
         service.delete(id, user.id());
+        return R.ok();
+    }
+
+    @PostMapping("/batch-delete")
+    public R<?> batchDelete(@RequestBody BatchIdsDTO dto) {
+        CurrentUser user = currentUserProvider.require();
+        requireAdmin(user);
+        service.deleteBatch(dto.normalizedIds(), user.id());
         return R.ok();
     }
 

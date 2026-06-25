@@ -14,6 +14,7 @@ public interface PaperService {
     ExamPaper create(PaperDTO dto, String operatorId, String operatorName);
     ExamPaper update(String id, PaperDTO dto, String operatorId);
     void delete(String id, String operatorId);
+    void deleteBatch(List<String> ids, String operatorId);
     void addSubject(String paperId, String subjectId, String versionId, String chapterId, Integer sort, Integer point);
     void removeSubject(String paperId, String subjectId);
     List<ExamPaperChapter> getChapters(String paperId);

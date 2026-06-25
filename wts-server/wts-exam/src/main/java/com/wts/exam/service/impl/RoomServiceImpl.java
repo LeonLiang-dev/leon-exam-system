@@ -174,6 +174,17 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     @Transactional
+    public void deleteBatch(List<String> ids, String operatorId) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要删除的答题室");
+        }
+        for (String id : ids) {
+            delete(id, operatorId);
+        }
+    }
+
+    @Override
+    @Transactional
     public void publish(String id, String operatorId) {
         ExamRoom room = roomMapper.selectById(id);
         if (room == null) throw BizException.notFound("答题室");
@@ -188,11 +199,33 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     @Transactional
+    public void publishBatch(List<String> ids, String operatorId) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要发布的答题室");
+        }
+        for (String id : ids) {
+            publish(id, operatorId);
+        }
+    }
+
+    @Override
+    @Transactional
     public void close(String id, String operatorId) {
         ExamRoom room = roomMapper.selectById(id);
         if (room == null) throw BizException.notFound("答题室");
         room.setPstate("31"); // Closed
         roomMapper.updateById(room);
+    }
+
+    @Override
+    @Transactional
+    public void closeBatch(List<String> ids, String operatorId) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要关闭的答题室");
+        }
+        for (String id : ids) {
+            close(id, operatorId);
+        }
     }
 
     @Override

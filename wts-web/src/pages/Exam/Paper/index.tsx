@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { Button, message, Modal, Form, Input, InputNumber, Popconfirm, Space, Select, Tag } from 'antd';
-import { PlusOutlined, ReloadOutlined, MinusCircleOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, ReloadOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import {
-  getPapers, createPaper, updatePaper, deletePaper,
+  getPapers, createPaper, updatePaper, deletePaper, batchDeletePapers,
   getPaperSubjects, addPaperSubject, getSubjects,
 } from '@/services/exam';
 
@@ -23,6 +23,8 @@ const PaperPage: React.FC = () => {
   const [addingSubjectIds, setAddingSubjectIds] = useState<string[]>([]);
   const [addingPoint, setAddingPoint] = useState<number>(1);
   const [batchAdding, setBatchAdding] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
 
   // Auto-set point from first selected subject's default
   useEffect(() => {
@@ -144,6 +146,34 @@ const PaperPage: React.FC = () => {
     }
   };
 
+  const handleBatchDelete = () => {
+    const ids = selectedRowKeys.map(String);
+    if (ids.length === 0) {
+      message.warning('请先选择试卷');
+      return;
+    }
+    Modal.confirm({
+      title: `确定删除选中的 ${ids.length} 份试卷？`,
+      content: '删除试卷会同时移除试卷下的章节和题目关联。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchDeleting(true);
+        try {
+          await batchDeletePapers(ids);
+          message.success('批量删除成功');
+          setSelectedRowKeys([]);
+          actionRef.current?.reload();
+        } catch {
+          message.error('批量删除失败，部分试卷可能正在使用中');
+        } finally {
+          setBatchDeleting(false);
+        }
+      },
+    });
+  };
+
   return (
     <>
       <ProTable
@@ -171,6 +201,16 @@ const PaperPage: React.FC = () => {
           >
             刷新
           </Button>,
+          <Button
+            key="batch-delete"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchDeleting}
+            onClick={handleBatchDelete}
+          >
+            批量删除
+          </Button>,
         ]}
         request={async (params) => {
           const res: any = await getPapers({
@@ -183,6 +223,10 @@ const PaperPage: React.FC = () => {
             total: res.data?.total || 0,
             success: true,
           };
+        }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: setSelectedRowKeys,
         }}
         columns={columns}
       />

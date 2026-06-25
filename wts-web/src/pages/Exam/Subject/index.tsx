@@ -3,9 +3,24 @@ import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-comp
 import {
   Button, message, Modal, Form, Input, Select, Popconfirm, Space, InputNumber, Card, TreeSelect, Upload,
 } from 'antd';
-import { PlusOutlined, ReloadOutlined, MinusCircleOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 import {
-  getSubjects, getSubject, createSubject, updateSubject, deleteSubject, getSubjectTypeTree, importSubjects, exportSubjects,
+  DeleteOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  MinusCircleOutlined,
+  UploadOutlined,
+  DownloadOutlined,
+} from '@ant-design/icons';
+import {
+  getSubjects,
+  getSubject,
+  createSubject,
+  updateSubject,
+  deleteSubject,
+  batchDeleteSubjects,
+  getSubjectTypeTree,
+  importSubjects,
+  exportSubjects,
 } from '@/services/exam';
 
 const TIPTYPE_OPTIONS = [
@@ -26,6 +41,8 @@ const SubjectPage: React.FC = () => {
   const [selectedTiptype, setSelectedTiptype] = useState<string>('2');
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importTypeid, setImportTypeid] = useState<string>('');
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
 
   useEffect(() => {
     getSubjectTypeTree().then((res: any) => {
@@ -165,6 +182,32 @@ const SubjectPage: React.FC = () => {
     }
   };
 
+  const handleBatchDelete = () => {
+    const ids = selectedRowKeys.map(String);
+    if (ids.length === 0) {
+      message.warning('请先选择题目');
+      return;
+    }
+    Modal.confirm({
+      title: `确定删除选中的 ${ids.length} 道题目？`,
+      content: '删除后题目状态会变为已删除。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchDeleting(true);
+        try {
+          await batchDeleteSubjects(ids);
+          message.success('批量删除成功');
+          setSelectedRowKeys([]);
+          actionRef.current?.reload();
+        } finally {
+          setBatchDeleting(false);
+        }
+      },
+    });
+  };
+
   const showAnswers = ['2', '3', '4', '1'].includes(selectedTiptype);
 
   return (
@@ -194,6 +237,16 @@ const SubjectPage: React.FC = () => {
             onClick={() => actionRef.current?.reload()}
           >
             刷新
+          </Button>,
+          <Button
+            key="batch-delete"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchDeleting}
+            onClick={handleBatchDelete}
+          >
+            批量删除
           </Button>,
           <Button
             key="import"
@@ -235,6 +288,10 @@ const SubjectPage: React.FC = () => {
             total: res.data?.total || 0,
             success: true,
           };
+        }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: setSelectedRowKeys,
         }}
         columns={columns}
       />

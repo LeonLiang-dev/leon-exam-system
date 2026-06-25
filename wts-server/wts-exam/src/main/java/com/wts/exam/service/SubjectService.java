@@ -15,6 +15,7 @@ public interface SubjectService {
     ExamSubject create(SubjectDTO dto, String operatorId, String operatorName);
     ExamSubject update(String id, SubjectDTO dto, String operatorId, String operatorName);
     void delete(String id, String operatorId);
+    void deleteBatch(List<String> ids, String operatorId);
     ExamSubjectVersion getCurrentVersion(String subjectId);
     List<ExamSubjectAnswer> getVersionAnswers(String versionId);
 }

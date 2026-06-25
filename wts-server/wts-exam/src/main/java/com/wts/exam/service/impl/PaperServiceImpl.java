@@ -107,6 +107,17 @@ public class PaperServiceImpl implements PaperService {
 
     @Override
     @Transactional
+    public void deleteBatch(List<String> ids, String operatorId) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要删除的试卷");
+        }
+        for (String id : ids) {
+            delete(id, operatorId);
+        }
+    }
+
+    @Override
+    @Transactional
     public void addSubject(String paperId, String subjectId, String versionId, String chapterId, Integer sort, Integer point) {
         ExamSubject subject = subjectMapper.selectById(subjectId);
         if (subject == null) throw BizException.notFound("题目");

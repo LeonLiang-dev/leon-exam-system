@@ -102,4 +102,15 @@ public class SubjectTypeServiceImpl implements SubjectTypeService {
         existing.setMuser(operatorId);
         typeMapper.updateById(existing);
     }
+
+    @Override
+    @Transactional
+    public void deleteBatch(List<String> ids, String operatorId) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要删除的题目分类");
+        }
+        for (String id : ids) {
+            delete(id, operatorId);
+        }
+    }
 }

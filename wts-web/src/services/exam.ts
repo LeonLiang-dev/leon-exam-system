@@ -29,6 +29,11 @@ export async function deleteSubjectType(id: string) {
   return request.delete(`/subject-types/${id}`);
 }
 
+/** 批量删除题目分类 */
+export async function batchDeleteSubjectTypes(ids: string[]) {
+  return request.post('/subject-types/batch-delete', { ids });
+}
+
 // ==================== 题目 ====================
 
 /** 题目列表 */
@@ -61,6 +66,11 @@ export async function updateSubject(id: string, data: any) {
 /** 删除题目 */
 export async function deleteSubject(id: string) {
   return request.delete(`/subjects/${id}`);
+}
+
+/** 批量删除题目 */
+export async function batchDeleteSubjects(ids: string[]) {
+  return request.post('/subjects/batch-delete', { ids });
 }
 
 /** 批量导入题目（Excel） */
@@ -107,6 +117,11 @@ export async function updatePaper(id: string, data: any) {
 /** 删除试卷 */
 export async function deletePaper(id: string) {
   return request.delete(`/papers/${id}`);
+}
+
+/** 批量删除试卷 */
+export async function batchDeletePapers(ids: string[]) {
+  return request.post('/papers/batch-delete', { ids });
 }
 
 /** 获取试卷章节 */
@@ -192,14 +207,29 @@ export async function deleteRoom(id: string) {
   return request.delete(`/rooms/${id}`);
 }
 
+/** 批量删除答题室 */
+export async function batchDeleteRooms(ids: string[]) {
+  return request.post('/rooms/batch-delete', { ids });
+}
+
 /** 发布答题室 */
 export async function publishRoom(id: string) {
   return request.post(`/rooms/${id}/publish`);
 }
 
+/** 批量发布答题室 */
+export async function batchPublishRooms(ids: string[]) {
+  return request.post('/rooms/batch-publish', { ids });
+}
+
 /** 关闭答题室 */
 export async function closeRoom(id: string) {
   return request.post(`/rooms/${id}/close`);
+}
+
+/** 批量关闭答题室 */
+export async function batchCloseRooms(ids: string[]) {
+  return request.post('/rooms/batch-close', { ids });
 }
 
 /** 添加试卷到答题室 */
@@ -248,6 +278,11 @@ export async function deleteRandomItem(id: string) {
   return request.delete(`/random-items/${id}`);
 }
 
+/** 批量删除随机规则 */
+export async function batchDeleteRandomItems(ids: string[]) {
+  return request.post('/random-items/batch-delete', { ids });
+}
+
 /** 获取规则步骤 */
 export async function getRandomSteps(itemId: string) {
   return request.get(`/random-items/${itemId}/steps`);
@@ -266,6 +301,11 @@ export async function updateRandomStep(id: string, data: any) {
 /** 删除规则步骤 */
 export async function deleteRandomStep(id: string) {
   return request.delete(`/random-steps/${id}`);
+}
+
+/** 批量删除规则步骤 */
+export async function batchDeleteRandomSteps(ids: string[]) {
+  return request.post('/random-steps/batch-delete', { ids });
 }
 
 /** 生成随机试卷 */
@@ -313,4 +353,9 @@ export async function getRoomCards(roomId: string, params?: { page?: number; siz
 /** 人工阅卷 */
 export async function judgeCard(cardId: string, data?: any) {
   return request.post(`/cards/${cardId}/judge`, data);
+}
+
+/** 批量阅卷 */
+export async function batchJudgeCards(ids: string[]) {
+  return request.post('/cards/batch-judge', { ids });
 }
