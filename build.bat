@@ -4,9 +4,11 @@ setlocal EnableExtensions
 rem ============================================================
 rem Leon Exam System Build Script (Windows)
 rem Usage:
-rem   build.bat           - Build executable JAR
-rem   build.bat preflight - Check Windows packaging prerequisites
-rem   build.bat package   - Build Windows EXE with jpackage
+rem   build.bat               - Build executable JAR
+rem   build.bat preflight     - Check Windows packaging prerequisites
+rem   build.bat package       - Build Windows MSI installer with jpackage
+rem   build.bat package-exe   - Build Windows EXE installer with jpackage
+rem   build.bat package-debug - Build Windows MSI installer with console diagnostics
 rem ============================================================
 
 set "PROJECT_DIR=%~dp0"
@@ -23,7 +25,9 @@ set "JPACKAGE_DIR=%DIST_DIR%\jpackage"
 set "PAYLOAD_DIR=%DIST_DIR%\windows-payload"
 set "RUNTIME_DIR=%DIST_DIR%\runtime-image"
 set "PACKAGE_MODE=0"
-set "APP_VERSION=2.0.3"
+set "INSTALLER_TYPE=msi"
+set "WIN_CONSOLE_OPTION="
+set "APP_VERSION=2.0.4"
 set "WIN_UPGRADE_UUID=B7049603-F325-4AC9-B9E2-46CA1AA46E95"
 
 echo ==========================================
@@ -33,12 +37,16 @@ echo ==========================================
 if "%~1"=="" goto build
 if /i "%~1"=="preflight" goto preflight_only
 if /i "%~1"=="package" goto package_mode
+if /i "%~1"=="package-exe" goto package_exe_mode
+if /i "%~1"=="package-debug" goto package_debug_mode
 
 echo ERROR: Unknown command "%~1"
 echo Usage:
 echo   build.bat
 echo   build.bat preflight
 echo   build.bat package
+echo   build.bat package-exe
+echo   build.bat package-debug
 exit /b 1
 
 :preflight_only
@@ -48,8 +56,25 @@ exit /b 0
 
 :package_mode
 set "PACKAGE_MODE=1"
+set "INSTALLER_TYPE=msi"
 call :preflight_package
 if errorlevel 1 exit /b 1
+goto build
+
+:package_exe_mode
+set "PACKAGE_MODE=1"
+set "INSTALLER_TYPE=exe"
+call :preflight_package
+if errorlevel 1 exit /b 1
+goto build
+
+:package_debug_mode
+set "PACKAGE_MODE=1"
+set "INSTALLER_TYPE=msi"
+set "WIN_CONSOLE_OPTION=--win-console"
+call :preflight_package
+if errorlevel 1 exit /b 1
+goto build
 
 :build
 rem Step 1: Build frontend
@@ -126,7 +151,8 @@ if not "%PACKAGE_MODE%"=="1" (
 )
 
 echo.
-echo Building Windows installer with launcher, JRE, MariaDB and backend...
+echo Building Windows %INSTALLER_TYPE% installer with launcher, JRE, MariaDB and backend...
+echo Package version: %APP_VERSION%
 
 echo.
 echo [package] Building launcher...
@@ -174,16 +200,22 @@ if not exist "%RUNTIME_DIR%\bin\java.exe" (
     echo ERROR: Runtime image does not contain java.exe: "%RUNTIME_DIR%\bin\java.exe"
     exit /b 1
 )
+"%RUNTIME_DIR%\bin\java.exe" --list-modules | findstr /B /C:"java.desktop@" >nul
+if errorlevel 1 (
+    echo ERROR: Runtime image does not contain java.desktop. Swing launcher cannot show a window.
+    exit /b 1
+)
 
 jpackage ^
     --name LeonExam ^
-    --type exe ^
+    --type "%INSTALLER_TYPE%" ^
     --dest "%JPACKAGE_DIR%" ^
     --input "%PAYLOAD_DIR%" ^
     --runtime-image "%RUNTIME_DIR%" ^
     --main-jar launcher.jar ^
     --main-class com.wts.launcher.LeonExamLauncher ^
     --java-options "-Dfile.encoding=UTF-8" ^
+    %WIN_CONSOLE_OPTION% ^
     --win-dir-chooser ^
     --win-shortcut ^
     --win-menu ^
@@ -199,6 +231,8 @@ if errorlevel 1 (
 echo.
 echo ==========================================
 echo   Windows installer built.
+echo   Type: %INSTALLER_TYPE%
+echo   Version: %APP_VERSION%
 echo   Location: %JPACKAGE_DIR%
 echo ==========================================
 
