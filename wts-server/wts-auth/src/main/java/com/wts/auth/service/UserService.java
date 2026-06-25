@@ -26,8 +26,11 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +43,8 @@ public class UserService {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String STUDENT_TYPE = "2";
     private static final String ENABLED_STATE = "1";
+    private static final String DISABLED_STATE = "0";
+    private static final String SYSADMIN_LOGIN = "sysadmin";
     private static final String DEFAULT_STUDENT_PASSWORD = "123123";
 
     /**
@@ -175,15 +180,72 @@ public class UserService {
      * 删除用户 (逻辑删除: 设为禁用)
      */
     public void deleteUser(String id, String operatorId) {
-        SysUser user = userMapper.selectById(id);
-        if (user == null) {
-            throw BizException.notFound("用户不存在");
-        }
+        disableUsers(List.of(id), operatorId);
+    }
+
+    /**
+     * 批量禁用用户。
+     */
+    @Transactional
+    public void disableUsers(List<String> ids, String operatorId) {
+        List<SysUser> users = loadUsersForWrite(ids, operatorId, "禁用");
         String now = LocalDateTime.now().format(FMT);
-        user.setState("0");
-        user.setUtime(now);
-        user.setMuser(operatorId);
-        userMapper.updateById(user);
+        for (SysUser user : users) {
+            user.setState(DISABLED_STATE);
+            user.setUtime(now);
+            user.setMuser(operatorId);
+            userMapper.updateById(user);
+        }
+    }
+
+    /**
+     * 永久删除单个用户。
+     */
+    public void hardDeleteUser(String id, String operatorId) {
+        hardDeleteUsers(List.of(id), operatorId);
+    }
+
+    /**
+     * 批量永久删除用户。
+     */
+    @Transactional
+    public void hardDeleteUsers(List<String> ids, String operatorId) {
+        List<SysUser> users = loadUsersForWrite(ids, operatorId, "删除");
+        List<String> userIds = users.stream().map(SysUser::getId).toList();
+        userorgMapper.delete(new LambdaQueryWrapper<SysUserorg>().in(SysUserorg::getUserid, userIds));
+        userMapper.deleteBatchIds(userIds);
+    }
+
+    private List<SysUser> loadUsersForWrite(List<String> ids, String operatorId, String actionName) {
+        if (ids == null || ids.isEmpty()) {
+            throw BizException.fail("请选择要" + actionName + "的用户");
+        }
+        List<String> normalizedIds = ids.stream()
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        if (normalizedIds.isEmpty()) {
+            throw BizException.fail("请选择要" + actionName + "的用户");
+        }
+
+        List<SysUser> users = userMapper.selectBatchIds(normalizedIds);
+        Set<String> foundIds = users.stream().map(SysUser::getId).collect(Collectors.toSet());
+        List<String> missingIds = normalizedIds.stream()
+                .filter(id -> !foundIds.contains(id))
+                .toList();
+        if (!missingIds.isEmpty()) {
+            throw BizException.fail("部分用户不存在: " + String.join(", ", missingIds));
+        }
+
+        for (SysUser user : users) {
+            if (Objects.equals(user.getId(), operatorId)) {
+                throw BizException.fail("不能" + actionName + "当前登录用户");
+            }
+            if (SYSADMIN_LOGIN.equalsIgnoreCase(user.getLoginname())) {
+                throw BizException.fail("不能" + actionName + "内置超级管理员 sysadmin");
+            }
+        }
+        return users;
     }
 
     @Transactional

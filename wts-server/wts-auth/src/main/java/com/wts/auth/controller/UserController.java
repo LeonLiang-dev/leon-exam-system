@@ -1,6 +1,7 @@
 package com.wts.auth.controller;
 
 import com.wts.auth.dto.StudentImportResult;
+import com.wts.auth.dto.BatchIdsDTO;
 import com.wts.auth.dto.UserDTO;
 import com.wts.auth.entity.SysUser;
 import com.wts.auth.service.UserService;
@@ -64,6 +65,27 @@ public class UserController {
     public R<Void> delete(@PathVariable String id,
                           @AuthenticationPrincipal LoginUserDetails loginUser) {
         userService.deleteUser(id, loginUser.getUserId());
+        return R.ok();
+    }
+
+    @PostMapping("/batch-disable")
+    public R<Void> batchDisable(@RequestBody BatchIdsDTO dto,
+                                @AuthenticationPrincipal LoginUserDetails loginUser) {
+        userService.disableUsers(dto.getIds(), loginUser.getUserId());
+        return R.ok();
+    }
+
+    @DeleteMapping("/{id}/hard-delete")
+    public R<Void> hardDelete(@PathVariable String id,
+                              @AuthenticationPrincipal LoginUserDetails loginUser) {
+        userService.hardDeleteUser(id, loginUser.getUserId());
+        return R.ok();
+    }
+
+    @PostMapping("/batch-hard-delete")
+    public R<Void> batchHardDelete(@RequestBody BatchIdsDTO dto,
+                                   @AuthenticationPrincipal LoginUserDetails loginUser) {
+        userService.hardDeleteUsers(dto.getIds(), loginUser.getUserId());
         return R.ok();
     }
 

@@ -42,6 +42,21 @@ export async function deleteUser(id: string) {
   return request.delete(`/users/${id}`);
 }
 
+/** 批量禁用用户 */
+export async function disableUsers(ids: string[]) {
+  return request.post('/users/batch-disable', { ids });
+}
+
+/** 永久删除用户 */
+export async function hardDeleteUser(id: string) {
+  return request.delete(`/users/${id}/hard-delete`);
+}
+
+/** 批量永久删除用户 */
+export async function hardDeleteUsers(ids: string[]) {
+  return request.post('/users/batch-hard-delete', { ids });
+}
+
 /** 重置密码 */
 export async function resetPassword(id: string) {
   return request.post(`/users/${id}/reset-password`);

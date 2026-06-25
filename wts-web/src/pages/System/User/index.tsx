@@ -1,12 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { Button, message, Modal, Form, Input, Select, Popconfirm, Space, Upload } from 'antd';
-import { PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UploadOutlined } from '@ant-design/icons';
 import {
   getUsers,
   createUser,
   updateUser,
   deleteUser,
+  disableUsers,
+  hardDeleteUser,
+  hardDeleteUsers,
   resetPassword,
   importStudentUsers,
 } from '@/services/system';
@@ -16,7 +19,63 @@ const UserPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [importing, setImporting] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [batchOperating, setBatchOperating] = useState(false);
   const [form] = Form.useForm();
+
+  const selectedUserIds = selectedRowKeys.map(String);
+
+  const clearSelection = () => setSelectedRowKeys([]);
+
+  const batchDisableSelected = () => {
+    if (selectedUserIds.length === 0) {
+      message.warning('请先选择用户');
+      return;
+    }
+    Modal.confirm({
+      title: `确定禁用选中的 ${selectedUserIds.length} 个用户？`,
+      content: '禁用后用户不能登录，但账号数据仍会保留。',
+      okText: '禁用',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchOperating(true);
+        try {
+          await disableUsers(selectedUserIds);
+          message.success('批量禁用成功');
+          clearSelection();
+          actionRef.current?.reload();
+        } finally {
+          setBatchOperating(false);
+        }
+      },
+    });
+  };
+
+  const batchHardDeleteSelected = () => {
+    if (selectedUserIds.length === 0) {
+      message.warning('请先选择用户');
+      return;
+    }
+    Modal.confirm({
+      title: `确定永久删除选中的 ${selectedUserIds.length} 个用户？`,
+      content: '永久删除会移除账号及其组织关联，操作不可恢复。',
+      okText: '永久删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setBatchOperating(true);
+        try {
+          await hardDeleteUsers(selectedUserIds);
+          message.success('批量删除成功');
+          clearSelection();
+          actionRef.current?.reload();
+        } finally {
+          setBatchOperating(false);
+        }
+      },
+    });
+  };
 
   const columns: ProColumns[] = [
     {
@@ -62,7 +121,7 @@ const UserPage: React.FC = () => {
     {
       title: '操作',
       valueType: 'option',
-      width: 220,
+      width: 280,
       render: (_, record) => (
         <Space>
           <a
@@ -91,7 +150,21 @@ const UserPage: React.FC = () => {
               actionRef.current?.reload();
             }}
           >
-            <a style={{ color: '#ff4d4f' }}>禁用</a>
+            <a style={{ color: '#fa8c16' }}>禁用</a>
+          </Popconfirm>
+          <Popconfirm
+            title="确定永久删除此用户？"
+            description="删除后账号及组织关联不可恢复。"
+            okText="永久删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={async () => {
+              await hardDeleteUser(record.id);
+              message.success('已删除');
+              actionRef.current?.reload();
+            }}
+          >
+            <a style={{ color: '#ff4d4f' }}>删除</a>
           </Popconfirm>
         </Space>
       ),
@@ -163,6 +236,25 @@ const UserPage: React.FC = () => {
           >
             新建用户
           </Button>,
+          <Button
+            key="batch-disable"
+            icon={<StopOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchOperating}
+            onClick={batchDisableSelected}
+          >
+            批量禁用
+          </Button>,
+          <Button
+            key="batch-delete"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchOperating}
+            onClick={batchHardDeleteSelected}
+          >
+            批量删除
+          </Button>,
           <Upload
             key="import-students"
             accept=".xlsx,.xls"
@@ -196,6 +288,10 @@ const UserPage: React.FC = () => {
             total: res.data?.total || 0,
             success: true,
           };
+        }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: setSelectedRowKeys,
         }}
         columns={columns}
       />

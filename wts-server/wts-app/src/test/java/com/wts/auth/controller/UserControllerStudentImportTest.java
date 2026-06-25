@@ -1,5 +1,6 @@
 package com.wts.auth.controller;
 
+import com.wts.auth.dto.BatchIdsDTO;
 import com.wts.auth.dto.StudentImportResult;
 import com.wts.auth.service.UserService;
 import com.wts.common.exception.BizException;
@@ -12,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.InputStream;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -64,6 +66,26 @@ class UserControllerStudentImportTest {
 
         assertEquals(403, error.getCode());
         verify(userService, never()).importStudents(any(), any());
+    }
+
+    @Test
+    void batchDisableDelegatesToService() {
+        BatchIdsDTO dto = new BatchIdsDTO();
+        dto.setIds(List.of("user-1", "user-2"));
+
+        controller.batchDisable(dto, loginUser("operator-1", "1"));
+
+        verify(userService).disableUsers(List.of("user-1", "user-2"), "operator-1");
+    }
+
+    @Test
+    void batchHardDeleteDelegatesToService() {
+        BatchIdsDTO dto = new BatchIdsDTO();
+        dto.setIds(List.of("user-1", "user-2"));
+
+        controller.batchHardDelete(dto, loginUser("operator-1", "1"));
+
+        verify(userService).hardDeleteUsers(List.of("user-1", "user-2"), "operator-1");
     }
 
     private static LoginUserDetails loginUser(String userId, String userType) {
