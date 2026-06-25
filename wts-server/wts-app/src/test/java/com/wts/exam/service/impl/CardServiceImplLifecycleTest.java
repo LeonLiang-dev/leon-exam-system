@@ -314,6 +314,7 @@ class CardServiceImplLifecycleTest {
         assertEquals("card-1", answerCaptor.getValue().getCardid());
         assertEquals("version-1", answerCaptor.getValue().getVersionid());
         assertEquals("answer-1", answerCaptor.getValue().getAnswerid());
+        assertEquals("user-1", answerCaptor.getValue().getCuser());
         assertEquals("true", answerCaptor.getValue().getValstr());
 
         ArgumentCaptor<ExamCardPoint> pointCaptor = ArgumentCaptor.forClass(ExamCardPoint.class);

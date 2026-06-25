@@ -480,7 +480,7 @@ CREATE TABLE IF NOT EXISTS `wts_card_answer` (
   `CARDID` varchar(32) NOT NULL,
   `ANSWERID` varchar(32) DEFAULT NULL,
   `VERSIONID` varchar(32) NOT NULL,
-  `CUSER` varchar(32) NOT NULL,
+  `CUSER` varchar(32) NOT NULL DEFAULT '',
   `VALSTR` text NOT NULL,
   `CTIME` varchar(16) NOT NULL,
   `PCONTENT` varchar(256) DEFAULT NULL,

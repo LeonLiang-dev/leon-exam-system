@@ -108,10 +108,10 @@ public class CardServiceImpl implements CardService {
         if (card == null) throw BizException.notFound("答卷");
         ensureCardOwner(card, userId);
         ensureCardCanAnswer(card);
-        saveAnswersForCard(cardId, dto);
+        saveAnswersForCard(cardId, dto, userId);
     }
 
-    private void saveAnswersForCard(String cardId, CardSubmitDTO dto) {
+    private void saveAnswersForCard(String cardId, CardSubmitDTO dto, String userId) {
         List<CardAnswerDTO> answers = dto != null && dto.getAnswers() != null
                 ? dto.getAnswers()
                 : Collections.emptyList();
@@ -128,6 +128,7 @@ public class CardServiceImpl implements CardService {
 
         List<ExamCardAnswer> toInsert = new ArrayList<>();
         List<ExamCardAnswer> toUpdate = new ArrayList<>();
+        String now = ExamTimeUtils.nowCompact();
 
         for (CardAnswerDTO ansDto : answers) {
             String key = ansDto.getVersionid() + "|" + ansDto.getAnswerid();
@@ -141,9 +142,10 @@ public class CardServiceImpl implements CardService {
                 ca.setCardid(cardId);
                 ca.setVersionid(ansDto.getVersionid());
                 ca.setAnswerid(ansDto.getAnswerid());
+                ca.setCuser(userId);
                 ca.setValstr(ansDto.getValstr());
                 ca.setPstate("1");
-                ca.setCtime(ExamTimeUtils.nowCompact());
+                ca.setCtime(now);
                 toInsert.add(ca);
             }
         }
@@ -163,7 +165,7 @@ public class CardServiceImpl implements CardService {
         if (card == null) throw BizException.notFound("答卷");
         ensureCardOwner(card, userId);
         ensureCardCanAnswer(card);
-        saveAnswersForCard(cardId, dto);
+        saveAnswersForCard(cardId, dto, userId);
         autoGrade(card);
         card.setPstate(CARD_SUBMITTED);
         card.setSubmittime(ExamTimeUtils.nowCompact());
