@@ -2,6 +2,7 @@ package com.wts.exam.service.impl;
 
 import com.wts.common.exception.BizException;
 import com.wts.common.result.PageResult;
+import com.wts.exam.dto.RoomDTO;
 import com.wts.exam.entity.ExamCard;
 import com.wts.exam.entity.ExamRoom;
 import com.wts.exam.entity.ExamRoomUser;
@@ -176,6 +177,63 @@ class RoomServiceImplParticipationTest {
         verify(roomMapper).updateById(room);
     }
 
+    @Test
+    void createAllowsManualRoomState() {
+        RoomDTO dto = roomDto("21");
+
+        ExamRoom room = service.create(dto, "teacher-1", "Teacher One");
+
+        assertEquals("21", room.getPstate());
+        assertEquals("room-name", room.getName());
+        verify(roomMapper).insert(room);
+    }
+
+    @Test
+    void createDefaultsRoomStateToDraft() {
+        RoomDTO dto = roomDto(null);
+
+        ExamRoom room = service.create(dto, "teacher-1", "Teacher One");
+
+        assertEquals("11", room.getPstate());
+        verify(roomMapper).insert(room);
+    }
+
+    @Test
+    void updateAllowsManualRoomStateChange() {
+        ExamRoom room = room("room-1", "21", "1");
+        when(roomMapper.selectById("room-1")).thenReturn(room);
+        RoomDTO dto = roomDto("31");
+
+        ExamRoom updated = service.update("room-1", dto, "teacher-1");
+
+        assertEquals(room, updated);
+        assertEquals("31", room.getPstate());
+        verify(roomMapper).updateById(room);
+    }
+
+    @Test
+    void updateKeepsCurrentRoomStateWhenDtoOmitsState() {
+        ExamRoom room = room("room-1", "21", "1");
+        when(roomMapper.selectById("room-1")).thenReturn(room);
+        RoomDTO dto = roomDto(null);
+
+        service.update("room-1", dto, "teacher-1");
+
+        assertEquals("21", room.getPstate());
+        verify(roomMapper).updateById(room);
+    }
+
+    @Test
+    void createRejectsInvalidRoomState() {
+        RoomDTO dto = roomDto("99");
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.create(dto, "teacher-1", "Teacher One"));
+
+        assertEquals("答题室状态无效", error.getMessage());
+        verify(roomMapper, never()).insert(any(ExamRoom.class));
+    }
+
     private static ExamRoom room(String id, String pstate, String publictype) {
         ExamRoom room = new ExamRoom();
         room.setId(id);
@@ -199,5 +257,16 @@ class RoomServiceImplParticipationTest {
         card.setUserid(userId);
         card.setPstate(pstate);
         return card;
+    }
+
+    private static RoomDTO roomDto(String pstate) {
+        RoomDTO dto = new RoomDTO();
+        dto.setName("room-name");
+        dto.setPstate(pstate);
+        dto.setPublictype("1");
+        dto.setStarttime(ExamTimeUtils.format(LocalDateTime.now().minusMinutes(5)));
+        dto.setEndtime(ExamTimeUtils.format(LocalDateTime.now().plusHours(1)));
+        dto.setTimelen(60);
+        return dto;
     }
 }

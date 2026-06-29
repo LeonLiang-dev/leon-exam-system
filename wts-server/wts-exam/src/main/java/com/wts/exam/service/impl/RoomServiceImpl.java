@@ -126,7 +126,7 @@ public class RoomServiceImpl implements RoomService {
         room.setPshowtype(dto.getPshowtype() != null ? dto.getPshowtype() : "1");
         room.setStarttime(starttime);
         room.setEndtime(endtime);
-        room.setPstate("11"); // Draft state
+        room.setPstate(normalizeRoomState(dto.getPstate(), "11"));
         String now = ExamTimeUtils.nowCompact();
         room.setCtime(now);
         room.setEtime(now);
@@ -160,6 +160,7 @@ public class RoomServiceImpl implements RoomService {
         room.setPshowtype(dto.getPshowtype());
         room.setStarttime(starttime);
         room.setEndtime(endtime);
+        room.setPstate(normalizeRoomState(dto.getPstate(), room.getPstate()));
         roomMapper.updateById(room);
         return room;
     }
@@ -362,5 +363,15 @@ public class RoomServiceImpl implements RoomService {
         }
         room.setStarttime(starttime);
         room.setEndtime(endtime);
+    }
+
+    private String normalizeRoomState(String pstate, String defaultState) {
+        if (pstate == null || pstate.isBlank()) {
+            return defaultState != null && !defaultState.isBlank() ? defaultState : "11";
+        }
+        if (!"11".equals(pstate) && !"21".equals(pstate) && !"31".equals(pstate)) {
+            throw BizException.fail("答题室状态无效");
+        }
+        return pstate;
     }
 }

@@ -6,6 +6,7 @@ import lombok.Data;
 public class RoomDTO {
     private String name;
     private String examtypeid;
+    private String pstate;
     private String pshowtype;
     private String timetype;
     private String starttime;

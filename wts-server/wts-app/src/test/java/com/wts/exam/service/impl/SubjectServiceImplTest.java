@@ -118,14 +118,14 @@ class SubjectServiceImplTest {
     }
 
     @Test
-    void deleteMarksSubjectDisabled() {
+    void deleteRemovesSubjectRecord() {
         ExamSubject subject = subject("subject-1", "version-1");
         when(subjectMapper.selectById("subject-1")).thenReturn(subject);
 
         service.delete("subject-1", "teacher-1");
 
-        assertEquals("0", subject.getPstate());
-        verify(subjectMapper).updateById(subject);
+        verify(subjectMapper).deleteById("subject-1");
+        verify(subjectMapper, never()).updateById(any(ExamSubject.class));
     }
 
     @Test

@@ -190,7 +190,7 @@ const SubjectPage: React.FC = () => {
     }
     Modal.confirm({
       title: `确定删除选中的 ${ids.length} 道题目？`,
-      content: '删除后题目状态会变为已删除。',
+      content: '删除后题目会从题库中移除。',
       okText: '删除',
       cancelText: '取消',
       okButtonProps: { danger: true },

@@ -184,8 +184,7 @@ public class SubjectServiceImpl implements SubjectService {
     public void delete(String id, String operatorId) {
         ExamSubject subject = subjectMapper.selectById(id);
         if (subject == null) throw BizException.notFound("题目");
-        subject.setPstate("0");
-        subjectMapper.updateById(subject);
+        subjectMapper.deleteById(id);
     }
 
     @Override

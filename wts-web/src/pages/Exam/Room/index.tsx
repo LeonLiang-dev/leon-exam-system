@@ -271,6 +271,7 @@ const RoomPage: React.FC = () => {
               form.setFieldsValue({
                 ...record,
                 publictype: record.publictype || '1',
+                pstate: record.pstate || '11',
                 starttime: parseRoomDateTime(record.starttime),
                 endtime: parseRoomDateTime(record.endtime),
               });
@@ -533,6 +534,13 @@ const RoomPage: React.FC = () => {
             <Select>
               <Select.Option value="1">公开</Select.Option>
               <Select.Option value="2">指定人员</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="pstate" label="答题室状态" initialValue="11">
+            <Select>
+              <Select.Option value="11">草稿</Select.Option>
+              <Select.Option value="21">已发布</Select.Option>
+              <Select.Option value="31">已关闭</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item
