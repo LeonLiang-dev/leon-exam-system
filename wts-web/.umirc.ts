@@ -85,6 +85,7 @@ export default defineConfig({
           name: '答卷列表',
           path: '/exam/room/:roomId/cards',
           component: './Exam/Room/CardList',
+          hideInMenu: true,
         },
         {
           name: '随机组卷',

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, history } from '@umijs/max';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { Button, message, Modal, Tag, Space } from 'antd';
@@ -17,6 +17,13 @@ const CardListPage: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
   const [batchJudging, setBatchJudging] = useState(false);
+  const invalidRoomId = !roomId || roomId.startsWith(':');
+
+  useEffect(() => {
+    if (!invalidRoomId) return;
+    message.warning('请先从答题室列表选择一个答题室');
+    history.replace('/exam/room');
+  }, [invalidRoomId]);
 
   const handleBatchJudge = () => {
     if (selectedRows.length === 0) {
@@ -144,6 +151,13 @@ const CardListPage: React.FC = () => {
           </Button>,
         ]}
         request={async (params) => {
+          if (invalidRoomId) {
+            return {
+              data: [],
+              total: 0,
+              success: true,
+            };
+          }
           const res: any = await getRoomCards(roomId!, {
             page: params.current,
             size: params.pageSize,
