@@ -30,6 +30,8 @@ public class RoomServiceImpl implements RoomService {
     private final ExamRoomPaperMapper roomPaperMapper;
     private final ExamRoomUserMapper roomUserMapper;
     private final ExamCardMapper cardMapper;
+    private final ExamCardAnswerMapper cardAnswerMapper;
+    private final ExamCardPointMapper cardPointMapper;
     private final RoomParticipationPolicy roomParticipationPolicy;
     private static final String ROOM_PUBLISHED = "21";
     private static final String CARD_SUBMITTED = "16";
@@ -183,6 +185,7 @@ public class RoomServiceImpl implements RoomService {
     @Override
     @Transactional
     public void delete(String id, String operatorId) {
+        deleteRoomCards(id);
         roomPaperMapper.delete(new LambdaQueryWrapper<ExamRoomPaper>().eq(ExamRoomPaper::getRoomid, id));
         roomUserMapper.delete(new LambdaQueryWrapper<ExamRoomUser>().eq(ExamRoomUser::getRoomid, id));
         roomMapper.deleteById(id);
@@ -388,6 +391,22 @@ public class RoomServiceImpl implements RoomService {
             throw BizException.fail("答题室状态无效");
         }
         return pstate;
+    }
+
+    private void deleteRoomCards(String roomId) {
+        List<String> cardIds = cardMapper.selectList(new LambdaQueryWrapper<ExamCard>()
+                        .eq(ExamCard::getRoomid, roomId))
+                .stream()
+                .map(ExamCard::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toList());
+        if (!cardIds.isEmpty()) {
+            cardAnswerMapper.delete(new LambdaQueryWrapper<ExamCardAnswer>()
+                    .in(ExamCardAnswer::getCardid, cardIds));
+            cardPointMapper.delete(new LambdaQueryWrapper<ExamCardPoint>()
+                    .in(ExamCardPoint::getCardid, cardIds));
+        }
+        cardMapper.delete(new LambdaQueryWrapper<ExamCard>().eq(ExamCard::getRoomid, roomId));
     }
 
     private String valueOrEmpty(String value) {

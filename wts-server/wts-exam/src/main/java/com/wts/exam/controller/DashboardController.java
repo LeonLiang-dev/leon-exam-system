@@ -3,7 +3,6 @@ package com.wts.exam.controller;
 import com.wts.common.result.R;
 import com.wts.common.security.CurrentUser;
 import com.wts.common.security.CurrentUserProvider;
-import com.wts.exam.entity.ExamCard;
 import com.wts.exam.entity.ExamPaper;
 import com.wts.exam.entity.ExamRoom;
 import com.wts.exam.entity.ExamSubject;
@@ -39,9 +38,7 @@ public class DashboardController {
         long roomCount = roomMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamRoom>()
                         .eq(ExamRoom::getPstate, "21"));
-        long cardCount = cardMapper.selectCount(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamCard>()
-                        .in(ExamCard::getPstate, "16", "21"));
+        long cardCount = cardMapper.countFinishedCardsWithExistingRoom();
         long userCount = userMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUser>()
                         .eq(SysUser::getState, "1"));

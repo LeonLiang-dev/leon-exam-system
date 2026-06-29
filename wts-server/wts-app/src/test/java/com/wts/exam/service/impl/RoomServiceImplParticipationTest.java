@@ -7,6 +7,8 @@ import com.wts.exam.entity.ExamCard;
 import com.wts.exam.entity.ExamRoom;
 import com.wts.exam.entity.ExamRoomUser;
 import com.wts.exam.mapper.ExamCardMapper;
+import com.wts.exam.mapper.ExamCardAnswerMapper;
+import com.wts.exam.mapper.ExamCardPointMapper;
 import com.wts.exam.mapper.ExamRoomMapper;
 import com.wts.exam.mapper.ExamRoomPaperMapper;
 import com.wts.exam.mapper.ExamRoomUserMapper;
@@ -40,6 +42,10 @@ class RoomServiceImplParticipationTest {
     private ExamRoomUserMapper roomUserMapper;
     @Mock
     private ExamCardMapper cardMapper;
+    @Mock
+    private ExamCardAnswerMapper cardAnswerMapper;
+    @Mock
+    private ExamCardPointMapper cardPointMapper;
 
     private RoomServiceImpl service;
 
@@ -50,6 +56,8 @@ class RoomServiceImplParticipationTest {
                 roomPaperMapper,
                 roomUserMapper,
                 cardMapper,
+                cardAnswerMapper,
+                cardPointMapper,
                 new RoomParticipationPolicy(roomUserMapper)
         );
     }
@@ -132,6 +140,23 @@ class RoomServiceImplParticipationTest {
                 () -> service.getAssignedUsers("missing-room"));
 
         assertEquals(404, error.getCode());
+    }
+
+    @Test
+    void deleteRemovesRoomCardsAndCardChildren() {
+        when(cardMapper.selectList(any())).thenReturn(List.of(
+                card("card-1", "room-1", "user-1", "16"),
+                card("card-2", "room-1", "user-2", "21")
+        ));
+
+        service.delete("room-1", "teacher-1");
+
+        verify(cardAnswerMapper).delete(any());
+        verify(cardPointMapper).delete(any());
+        verify(cardMapper).delete(any());
+        verify(roomPaperMapper).delete(any());
+        verify(roomUserMapper).delete(any());
+        verify(roomMapper).deleteById("room-1");
     }
 
     @Test

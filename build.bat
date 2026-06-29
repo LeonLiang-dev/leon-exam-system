@@ -27,7 +27,7 @@ set "RUNTIME_DIR=%DIST_DIR%\runtime-image"
 set "PACKAGE_MODE=0"
 set "INSTALLER_TYPE=msi"
 set "WIN_CONSOLE_OPTION="
-set "APP_VERSION=2.0.13"
+set "APP_VERSION=2.0.14"
 set "WIN_UPGRADE_UUID=B7049603-F325-4AC9-B9E2-46CA1AA46E95"
 
 echo ==========================================
@@ -330,6 +330,11 @@ if not exist "%PROJECT_DIR%sql\migrations\V7_fix_room_audit_defaults.sql" (
 
 if not exist "%PROJECT_DIR%sql\migrations\V8_fix_exam_create_defaults.sql" (
     echo ERROR: Missing migration SQL: "%PROJECT_DIR%sql\migrations\V8_fix_exam_create_defaults.sql"
+    exit /b 1
+)
+
+if not exist "%PROJECT_DIR%sql\migrations\V9_cleanup_orphan_cards.sql" (
+    echo ERROR: Missing migration SQL: "%PROJECT_DIR%sql\migrations\V9_cleanup_orphan_cards.sql"
     exit /b 1
 )
 
