@@ -36,6 +36,7 @@ public class CardController {
         result.put("card", card);
         result.put("answers", answers);
         result.put("points", points);
+        result.put("paper", service.getExamPaperForReview(id));
         return R.ok(result);
     }
 

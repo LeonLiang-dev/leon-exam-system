@@ -113,6 +113,7 @@ class CardControllerCurrentUserTest {
         verify(service).getResult("card-1", "student-1", false);
         verify(service, never()).getCardAnswers("card-1");
         verify(service, never()).getCardPoints("card-1");
+        verify(service, never()).getExamPaperForReview("card-1");
     }
 
     @Test
@@ -130,6 +131,7 @@ class CardControllerCurrentUserTest {
         verify(service).getResult("card-1", "student-1", false);
         verify(service).getCardAnswers("card-1");
         verify(service).getCardPoints("card-1");
+        verify(service).getExamPaperForReview("card-1");
     }
 
     @Test
@@ -146,6 +148,7 @@ class CardControllerCurrentUserTest {
         verify(service).getResult("card-1", "user-1", true);
         verify(service).getCardAnswers("card-1");
         verify(service).getCardPoints("card-1");
+        verify(service).getExamPaperForReview("card-1");
     }
 
     private void authenticate(String userId, String loginName, String name, String userType) {

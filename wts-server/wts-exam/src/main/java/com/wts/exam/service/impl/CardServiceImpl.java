@@ -41,6 +41,7 @@ public class CardServiceImpl implements CardService {
     private static final String CARD_JUDGED = "21";
     private static final String ROOM_PUBLISHED = "21";
     private static final String ROOM_CLOSED = "31";
+    private static final Set<String> MANUAL_TIP_TYPES = Set.of("5", "6");
 
     @Override
     @Transactional
@@ -166,9 +167,16 @@ public class CardServiceImpl implements CardService {
         ensureCardOwner(card, userId);
         ensureCardCanAnswer(card);
         saveAnswersForCard(cardId, dto, userId);
-        autoGrade(card);
-        card.setPstate(CARD_SUBMITTED);
-        card.setSubmittime(ExamTimeUtils.nowCompact());
+        boolean needsManualReview = autoGrade(card);
+        String now = ExamTimeUtils.nowCompact();
+        card.setPstate(needsManualReview ? CARD_SUBMITTED : CARD_JUDGED);
+        card.setSubmittime(now);
+        if (!needsManualReview) {
+            card.setAdjudgeuser("AUTO");
+            card.setAdjudgeusername("系统自动阅卷");
+            card.setAdjudgetime(now);
+            card.setAdjudgeuseruuid("AUTO");
+        }
         cardMapper.updateById(card);
         return card;
     }
@@ -221,10 +229,32 @@ public class CardServiceImpl implements CardService {
                             .eq(ExamCardPoint::getCardid, cardId))
                     .stream().collect(Collectors.toMap(ExamCardPoint::getVersionid, p -> p));
 
+            Set<String> requestedVersionIds = dto.getPoints().stream()
+                    .map(JudgeDTO.JudgePointDTO::getVersionId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Map<String, ExamSubjectVersion> versionMap = requestedVersionIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : versionMapper.selectList(new LambdaQueryWrapper<ExamSubjectVersion>()
+                            .in(ExamSubjectVersion::getId, requestedVersionIds))
+                    .stream().collect(Collectors.toMap(ExamSubjectVersion::getId, version -> version));
+
             for (JudgeDTO.JudgePointDTO pointDto : dto.getPoints()) {
                 ExamCardPoint cp = pointMap.get(pointDto.getVersionId());
                 if (cp != null) {
-                    cp.setPoint(pointDto.getPoint());
+                    ExamSubjectVersion version = versionMap.get(pointDto.getVersionId());
+                    if (version == null) {
+                        throw BizException.notFound("题目版本");
+                    }
+                    if (!isManualType(version.getTiptype())) {
+                        throw BizException.fail("客观题由系统自动评阅，不允许手动改分");
+                    }
+                    int point = pointDto.getPoint() != null ? pointDto.getPoint() : 0;
+                    int maxPoint = cp.getMpoint() != null ? cp.getMpoint() : 0;
+                    if (point < 0 || point > maxPoint) {
+                        throw BizException.fail("评分不能超出题目分值");
+                    }
+                    cp.setPoint(point);
                     cardPointMapper.updateById(cp);
                 }
             }
@@ -255,7 +285,7 @@ public class CardServiceImpl implements CardService {
         }
     }
 
-    private void autoGrade(ExamCard card) {
+    private boolean autoGrade(ExamCard card) {
         // Delete existing points to prevent duplicates
         cardPointMapper.delete(
                 new LambdaQueryWrapper<ExamCardPoint>()
@@ -264,7 +294,7 @@ public class CardServiceImpl implements CardService {
         List<ExamPaperSubject> paperSubjects = paperSubjectMapper.selectList(
                 new LambdaQueryWrapper<ExamPaperSubject>()
                         .eq(ExamPaperSubject::getPaperid, card.getPaperid()));
-        if (paperSubjects.isEmpty()) return;
+        if (paperSubjects.isEmpty()) return false;
 
         Set<String> versionIds = paperSubjects.stream()
                 .map(ExamPaperSubject::getVersionid)
@@ -290,11 +320,15 @@ public class CardServiceImpl implements CardService {
 
         float totalPoint = 0;
         int completeNum = 0;
+        boolean needsManualReview = false;
 
         for (ExamPaperSubject ps : paperSubjects) {
             ExamSubjectVersion version = versionMap.get(ps.getVersionid());
             if (version == null) continue;
             String tipType = version.getTiptype();
+            if (isManualType(tipType)) {
+                needsManualReview = true;
+            }
 
             List<ExamCardAnswer> answers = answersByVersion.getOrDefault(ps.getVersionid(), Collections.emptyList());
 
@@ -319,6 +353,7 @@ public class CardServiceImpl implements CardService {
         card.setPoint(totalPoint);
         card.setCompletenum(completeNum);
         card.setAllnum(paperSubjects.size());
+        return needsManualReview;
     }
 
     @Override
@@ -491,6 +526,10 @@ public class CardServiceImpl implements CardService {
         if (end != null && now.isAfter(end)) {
             throw BizException.fail("答题室已结束，无法作答");
         }
+    }
+
+    private boolean isManualType(String tipType) {
+        return MANUAL_TIP_TYPES.contains(tipType);
     }
 
     private List<ExamPaperVO.SubjectVO> buildSubjectVOs(

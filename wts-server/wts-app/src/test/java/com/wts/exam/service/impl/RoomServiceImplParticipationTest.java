@@ -5,6 +5,7 @@ import com.wts.common.result.PageResult;
 import com.wts.exam.dto.RoomDTO;
 import com.wts.exam.entity.ExamCard;
 import com.wts.exam.entity.ExamRoom;
+import com.wts.exam.entity.ExamRoomPaper;
 import com.wts.exam.entity.ExamRoomUser;
 import com.wts.exam.mapper.ExamCardMapper;
 import com.wts.exam.mapper.ExamCardAnswerMapper;
@@ -144,6 +145,7 @@ class RoomServiceImplParticipationTest {
 
     @Test
     void deleteRemovesRoomCardsAndCardChildren() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "31", "1"));
         when(cardMapper.selectList(any())).thenReturn(List.of(
                 card("card-1", "room-1", "user-1", "16"),
                 card("card-2", "room-1", "user-2", "21")
@@ -157,6 +159,45 @@ class RoomServiceImplParticipationTest {
         verify(roomPaperMapper).delete(any());
         verify(roomUserMapper).delete(any());
         verify(roomMapper).deleteById("room-1");
+    }
+
+    @Test
+    void deleteRejectsPublishedRoom() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "21", "1"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.delete("room-1", "teacher-1"));
+
+        assertEquals("已发布答题室请先关闭后再删除", error.getMessage());
+        verify(cardMapper, never()).selectList(any());
+        verify(roomMapper, never()).deleteById("room-1");
+    }
+
+    @Test
+    void publishRejectsRoomWithoutPaper() {
+        ExamRoom room = room("room-1", "11", "1");
+        room.setStarttime(ExamTimeUtils.format(LocalDateTime.now().minusMinutes(5)));
+        room.setEndtime(ExamTimeUtils.format(LocalDateTime.now().plusHours(1)));
+        when(roomMapper.selectById("room-1")).thenReturn(room);
+        when(roomPaperMapper.selectCount(any())).thenReturn(0L);
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.publish("room-1", "teacher-1"));
+
+        assertEquals("请先添加试卷再发布", error.getMessage());
+        verify(roomMapper, never()).updateById(any(ExamRoom.class));
+    }
+
+    @Test
+    void publishRejectsNonDraftRoom() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "21", "1"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.publish("room-1", "teacher-1"));
+
+        assertEquals("只有草稿状态的答题室允许发布", error.getMessage());
+        verify(roomPaperMapper, never()).selectCount(any());
+        verify(roomMapper, never()).updateById(any(ExamRoom.class));
     }
 
     @Test
@@ -203,12 +244,35 @@ class RoomServiceImplParticipationTest {
     }
 
     @Test
-    void createAllowsManualRoomState() {
+    void closeRejectsDraftRoom() {
+        ExamRoom room = room("room-1", "11", "1");
+        when(roomMapper.selectById("room-1")).thenReturn(room);
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.close("room-1", "teacher-1"));
+
+        assertEquals("只有已发布的答题室允许关闭", error.getMessage());
+        verify(roomMapper, never()).updateById(any(ExamRoom.class));
+    }
+
+    @Test
+    void closeAcceptsPublishedRoom() {
+        ExamRoom room = room("room-1", "21", "1");
+        when(roomMapper.selectById("room-1")).thenReturn(room);
+
+        service.close("room-1", "teacher-1");
+
+        assertEquals("31", room.getPstate());
+        verify(roomMapper).updateById(room);
+    }
+
+    @Test
+    void createForcesRoomStateToDraft() {
         RoomDTO dto = roomDto("21");
 
         ExamRoom room = service.create(dto, "teacher-1", "Teacher One");
 
-        assertEquals("21", room.getPstate());
+        assertEquals("11", room.getPstate());
         assertEquals("room-name", room.getName());
         assertEquals("teacher-1", room.getCuser());
         assertEquals("Teacher One", room.getCusername());
@@ -237,39 +301,60 @@ class RoomServiceImplParticipationTest {
     }
 
     @Test
-    void updateAllowsManualRoomStateChange() {
+    void updateRejectsPublishedRoom() {
         ExamRoom room = room("room-1", "21", "1");
         when(roomMapper.selectById("room-1")).thenReturn(room);
-        RoomDTO dto = roomDto("31");
+        RoomDTO dto = roomDto("11");
 
-        ExamRoom updated = service.update("room-1", dto, "teacher-1");
+        BizException error = assertThrows(BizException.class,
+                () -> service.update("room-1", dto, "teacher-1"));
 
-        assertEquals(room, updated);
-        assertEquals("31", room.getPstate());
-        verify(roomMapper).updateById(room);
+        assertEquals("只有草稿状态的答题室允许修改", error.getMessage());
+        verify(roomMapper, never()).updateById(any(ExamRoom.class));
     }
 
     @Test
-    void updateKeepsCurrentRoomStateWhenDtoOmitsState() {
-        ExamRoom room = room("room-1", "21", "1");
+    void updateForcesRoomStateToDraft() {
+        ExamRoom room = room("room-1", "11", "1");
         when(roomMapper.selectById("room-1")).thenReturn(room);
-        RoomDTO dto = roomDto(null);
+        RoomDTO dto = roomDto("21");
 
         service.update("room-1", dto, "teacher-1");
 
-        assertEquals("21", room.getPstate());
+        assertEquals("11", room.getPstate());
         verify(roomMapper).updateById(room);
     }
 
     @Test
-    void createRejectsInvalidRoomState() {
+    void createIgnoresInvalidRoomStateAndForcesDraft() {
         RoomDTO dto = roomDto("99");
 
-        BizException error = assertThrows(BizException.class,
-                () -> service.create(dto, "teacher-1", "Teacher One"));
+        ExamRoom room = service.create(dto, "teacher-1", "Teacher One");
 
-        assertEquals("答题室状态无效", error.getMessage());
-        verify(roomMapper, never()).insert(any(ExamRoom.class));
+        assertEquals("11", room.getPstate());
+        verify(roomMapper).insert(room);
+    }
+
+    @Test
+    void addPaperRejectsPublishedRoom() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "21", "1"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.addPaper("room-1", "paper-1", "paper", 60F));
+
+        assertEquals("只有草稿状态的答题室允许绑定试卷", error.getMessage());
+        verify(roomPaperMapper, never()).insert(any(ExamRoomPaper.class));
+    }
+
+    @Test
+    void assignUsersRejectsPublishedRoom() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "21", "2"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.assignUsers("room-1", List.of("user-1")));
+
+        assertEquals("只有草稿状态的答题室允许分配人员", error.getMessage());
+        verify(roomUserMapper, never()).delete(any());
     }
 
     private static ExamRoom room(String id, String pstate, String publictype) {

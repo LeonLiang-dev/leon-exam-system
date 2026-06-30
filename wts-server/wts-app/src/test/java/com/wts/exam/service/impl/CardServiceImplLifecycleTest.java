@@ -39,9 +39,11 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -303,11 +305,15 @@ class CardServiceImplLifecycleTest {
 
         ExamCard submitted = service.submit("card-1", submitDto("version-1", "answer-1", "true"), "user-1");
 
-        assertEquals("16", submitted.getPstate());
+        assertEquals("21", submitted.getPstate());
         assertEquals(5f, submitted.getPoint());
         assertEquals(1, submitted.getCompletenum());
         assertEquals(1, submitted.getAllnum());
         assertNotNull(submitted.getSubmittime());
+        assertEquals("AUTO", submitted.getAdjudgeuser());
+        assertEquals("系统自动阅卷", submitted.getAdjudgeusername());
+        assertEquals("AUTO", submitted.getAdjudgeuseruuid());
+        assertNotNull(submitted.getAdjudgetime());
 
         ArgumentCaptor<ExamCardAnswer> answerCaptor = ArgumentCaptor.forClass(ExamCardAnswer.class);
         verify(cardAnswerMapper).insert(answerCaptor.capture());
@@ -325,6 +331,39 @@ class CardServiceImplLifecycleTest {
         assertEquals(5, pointCaptor.getValue().getMpoint());
         assertEquals("1", pointCaptor.getValue().getComplete());
 
+        verify(cardMapper).updateById(card);
+    }
+
+    @Test
+    void submitKeepsCardSubmittedWhenPaperContainsManualQuestion() {
+        ExamCard card = card("card-1", "paper-1", "room-1", "user-1", "11");
+        when(cardMapper.selectById("card-1")).thenReturn(card);
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "21"));
+        when(cardAnswerMapper.selectList(any()))
+                .thenReturn(List.of())
+                .thenReturn(List.of(cardAnswer("card-1", "version-1", "answer-1", "true")));
+        when(paperSubjectMapper.selectList(any()))
+                .thenReturn(List.of(
+                        paperSubject("paper-1", "subject-1", "version-1", 5),
+                        paperSubject("paper-1", "subject-2", "version-2", 10)
+                ));
+        when(versionMapper.selectList(any()))
+                .thenReturn(List.of(
+                        subjectVersion("version-1", "subject-1", "2"),
+                        subjectVersion("version-2", "subject-2", "5")
+                ));
+        when(answerMapper.selectList(any()))
+                .thenReturn(List.of(subjectAnswer("answer-1", "version-1", "1")));
+
+        ExamCard submitted = service.submit("card-1", submitDto("version-1", "answer-1", "true"), "user-1");
+
+        assertEquals("16", submitted.getPstate());
+        assertEquals(5f, submitted.getPoint());
+        assertEquals(1, submitted.getCompletenum());
+        assertEquals(2, submitted.getAllnum());
+        assertNotNull(submitted.getSubmittime());
+        assertNull(submitted.getAdjudgetime());
+        verify(cardPointMapper, times(2)).insert(any(ExamCardPoint.class));
         verify(cardMapper).updateById(card);
     }
 
@@ -435,10 +474,14 @@ class CardServiceImplLifecycleTest {
         ExamCard card = card("card-1", "paper-1", "room-1", "user-1", "16");
         ExamCardPoint manualPoint = cardPoint("card-1", "version-1", 0);
         ExamCardPoint objectivePoint = cardPoint("card-1", "version-2", 3);
+        manualPoint.setMpoint(10);
+        objectivePoint.setMpoint(3);
         when(cardMapper.selectById("card-1")).thenReturn(card);
         when(cardPointMapper.selectList(any()))
                 .thenReturn(List.of(manualPoint, objectivePoint))
                 .thenReturn(List.of(manualPoint, objectivePoint));
+        when(versionMapper.selectList(any()))
+                .thenReturn(List.of(subjectVersion("version-1", "subject-1", "5")));
 
         service.judge("card-1", judgeDto("version-1", 7), "teacher-1", "Teacher One");
 
@@ -452,6 +495,42 @@ class CardServiceImplLifecycleTest {
 
         verify(cardPointMapper).updateById(manualPoint);
         verify(cardMapper).updateById(card);
+    }
+
+    @Test
+    void judgeRejectsObjectivePointOverride() {
+        ExamCard card = card("card-1", "paper-1", "room-1", "user-1", "16");
+        ExamCardPoint objectivePoint = cardPoint("card-1", "version-1", 3);
+        objectivePoint.setMpoint(3);
+        when(cardMapper.selectById("card-1")).thenReturn(card);
+        when(cardPointMapper.selectList(any())).thenReturn(List.of(objectivePoint));
+        when(versionMapper.selectList(any()))
+                .thenReturn(List.of(subjectVersion("version-1", "subject-1", "2")));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.judge("card-1", judgeDto("version-1", 2), "teacher-1", "Teacher One"));
+
+        assertEquals("客观题由系统自动评阅，不允许手动改分", error.getMessage());
+        verify(cardPointMapper, never()).updateById(any(ExamCardPoint.class));
+        verify(cardMapper, never()).updateById(any(ExamCard.class));
+    }
+
+    @Test
+    void judgeRejectsPointAboveMax() {
+        ExamCard card = card("card-1", "paper-1", "room-1", "user-1", "16");
+        ExamCardPoint manualPoint = cardPoint("card-1", "version-1", 0);
+        manualPoint.setMpoint(5);
+        when(cardMapper.selectById("card-1")).thenReturn(card);
+        when(cardPointMapper.selectList(any())).thenReturn(List.of(manualPoint));
+        when(versionMapper.selectList(any()))
+                .thenReturn(List.of(subjectVersion("version-1", "subject-1", "5")));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.judge("card-1", judgeDto("version-1", 6), "teacher-1", "Teacher One"));
+
+        assertEquals("评分不能超出题目分值", error.getMessage());
+        verify(cardPointMapper, never()).updateById(any(ExamCardPoint.class));
+        verify(cardMapper, never()).updateById(any(ExamCard.class));
     }
 
     private static ExamRoom room(String id, String pstate) {

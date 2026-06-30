@@ -4,7 +4,7 @@ import { Card, Tag, Spin, Statistic, Row, Col, Divider, Button, Space, Result } 
 import { CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { getCardResult } from '@/services/exam';
 import { getRequestErrorMessage } from '@/utils/examTime';
-import AnswerValueView from './AnswerValueView';
+import AnswerValueView, { getCardAnswerDisplayValue } from './AnswerValueView';
 
 const TIPTYPE_LABELS: Record<string, string> = {
   '1': '填空题', '2': '单选题', '3': '多选题',
@@ -60,7 +60,7 @@ const ExamResultPage: React.FC = () => {
     return <div style={{ textAlign: 'center', padding: 100 }}>数据加载失败</div>;
   }
 
-  const { card, answers: cardAnswers, points } = data;
+  const { card, answers: cardAnswers, points, paper } = data;
   const pstateInfo = PSTATE_MAP[card?.pstate] || { text: '未知', color: 'default' };
 
   // Build answer map: versionId -> list of card answers (normalize casing)
@@ -76,6 +76,13 @@ const ExamResultPage: React.FC = () => {
   for (const p of points || []) {
     const key = p.versionid || p.versionId;
     pointMap[key] = p;
+  }
+
+  const subjectMap: Record<string, any> = {};
+  for (const chapter of paper?.chapters || []) {
+    for (const subject of chapter.subjects || []) {
+      subjectMap[subject.versionId] = subject;
+    }
   }
 
   return (
@@ -134,6 +141,7 @@ const ExamResultPage: React.FC = () => {
       <Card title="答题详情">
         {(points || []).map((pointInfo: any, index: number) => {
           const pointInfoKey = pointInfo.versionid || pointInfo.versionId;
+          const subject = subjectMap[pointInfoKey];
           const cardAns = answerMap[pointInfoKey] || [];
           const earnedPoint = pointInfo.point || 0;
           const maxPoint = pointInfo.mpoint || 0;
@@ -165,7 +173,10 @@ const ExamResultPage: React.FC = () => {
                     <span style={{ color: '#666' }}>你的答案：</span>
                     <Space wrap align="start" style={{ marginLeft: 4 }}>
                       {cardAns.map((a: any) => (
-                        <AnswerValueView key={a.id} value={a.valstr} />
+                        <AnswerValueView
+                          key={a.id}
+                          value={getCardAnswerDisplayValue(a, subject)}
+                        />
                       ))}
                     </Space>
                   </div>

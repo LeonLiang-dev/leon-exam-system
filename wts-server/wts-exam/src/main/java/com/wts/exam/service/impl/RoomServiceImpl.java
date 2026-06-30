@@ -33,7 +33,9 @@ public class RoomServiceImpl implements RoomService {
     private final ExamCardAnswerMapper cardAnswerMapper;
     private final ExamCardPointMapper cardPointMapper;
     private final RoomParticipationPolicy roomParticipationPolicy;
+    private static final String ROOM_DRAFT = "11";
     private static final String ROOM_PUBLISHED = "21";
+    private static final String ROOM_CLOSED = "31";
     private static final String CARD_SUBMITTED = "16";
     private static final String CARD_JUDGED = "21";
 
@@ -128,7 +130,7 @@ public class RoomServiceImpl implements RoomService {
         room.setPshowtype(dto.getPshowtype() != null ? dto.getPshowtype() : "1");
         room.setStarttime(starttime);
         room.setEndtime(endtime);
-        room.setPstate(normalizeRoomState(dto.getPstate(), "11"));
+        room.setPstate(ROOM_DRAFT);
         String now = ExamTimeUtils.nowCompact();
         room.setCtime(now);
         room.setEtime(now);
@@ -154,6 +156,7 @@ public class RoomServiceImpl implements RoomService {
     public ExamRoom update(String id, RoomDTO dto, String operatorId) {
         ExamRoom room = roomMapper.selectById(id);
         if (room == null) throw BizException.notFound("答题室");
+        requireDraftRoom(room, "修改");
         String starttime = ExamTimeUtils.normalizeNullable(dto.getStarttime(), "开始时间");
         String endtime = ExamTimeUtils.normalizeNullable(dto.getEndtime(), "结束时间");
         validateTimeOrder(starttime, endtime);
@@ -175,7 +178,7 @@ public class RoomServiceImpl implements RoomService {
         room.setPshowtype(dto.getPshowtype());
         room.setStarttime(starttime);
         room.setEndtime(endtime);
-        room.setPstate(normalizeRoomState(dto.getPstate(), room.getPstate()));
+        room.setPstate(ROOM_DRAFT);
         room.setEtime(ExamTimeUtils.nowCompact());
         room.setEuser(valueOrEmpty(operatorId));
         roomMapper.updateById(room);
@@ -185,6 +188,10 @@ public class RoomServiceImpl implements RoomService {
     @Override
     @Transactional
     public void delete(String id, String operatorId) {
+        ExamRoom room = roomMapper.selectById(id);
+        if (room != null && ROOM_PUBLISHED.equals(room.getPstate())) {
+            throw BizException.fail("已发布答题室请先关闭后再删除");
+        }
         deleteRoomCards(id);
         roomPaperMapper.delete(new LambdaQueryWrapper<ExamRoomPaper>().eq(ExamRoomPaper::getRoomid, id));
         roomUserMapper.delete(new LambdaQueryWrapper<ExamRoomUser>().eq(ExamRoomUser::getRoomid, id));
@@ -207,12 +214,13 @@ public class RoomServiceImpl implements RoomService {
     public void publish(String id, String operatorId) {
         ExamRoom room = roomMapper.selectById(id);
         if (room == null) throw BizException.notFound("答题室");
+        requireDraftRoom(room, "发布");
         // Check room has at least one paper
         Long paperCount = roomPaperMapper.selectCount(
                 new LambdaQueryWrapper<ExamRoomPaper>().eq(ExamRoomPaper::getRoomid, id));
         if (paperCount == 0) throw BizException.fail("请先添加试卷再发布");
         validatePublishTimeWindow(room);
-        room.setPstate("21"); // Published
+        room.setPstate(ROOM_PUBLISHED);
         roomMapper.updateById(room);
     }
 
@@ -232,7 +240,10 @@ public class RoomServiceImpl implements RoomService {
     public void close(String id, String operatorId) {
         ExamRoom room = roomMapper.selectById(id);
         if (room == null) throw BizException.notFound("答题室");
-        room.setPstate("31"); // Closed
+        if (!ROOM_PUBLISHED.equals(room.getPstate())) {
+            throw BizException.fail("只有已发布的答题室允许关闭");
+        }
+        room.setPstate(ROOM_CLOSED);
         roomMapper.updateById(room);
     }
 
@@ -250,6 +261,9 @@ public class RoomServiceImpl implements RoomService {
     @Override
     @Transactional
     public void addPaper(String roomId, String paperId, String name, Float passPoint) {
+        ExamRoom room = roomMapper.selectById(roomId);
+        if (room == null) throw BizException.notFound("答题室");
+        requireDraftRoom(room, "绑定试卷");
         ExamRoomPaper rp = new ExamRoomPaper();
         rp.setId(UUID.randomUUID().toString().replace("-", ""));
         rp.setRoomid(roomId);
@@ -262,6 +276,9 @@ public class RoomServiceImpl implements RoomService {
     @Override
     @Transactional
     public void removePaper(String roomId, String paperId) {
+        ExamRoom room = roomMapper.selectById(roomId);
+        if (room == null) throw BizException.notFound("答题室");
+        requireDraftRoom(room, "移除试卷");
         roomPaperMapper.delete(new LambdaQueryWrapper<ExamRoomPaper>()
                 .eq(ExamRoomPaper::getRoomid, roomId)
                 .eq(ExamRoomPaper::getPaperid, paperId));
@@ -287,6 +304,7 @@ public class RoomServiceImpl implements RoomService {
     public void assignUsers(String roomId, List<String> userIds) {
         ExamRoom room = roomMapper.selectById(roomId);
         if (room == null) throw BizException.notFound("答题室");
+        requireDraftRoom(room, "分配人员");
 
         roomUserMapper.delete(new LambdaQueryWrapper<ExamRoomUser>().eq(ExamRoomUser::getRoomid, roomId));
         if (userIds == null || userIds.isEmpty()) {
@@ -383,14 +401,10 @@ public class RoomServiceImpl implements RoomService {
         room.setEndtime(endtime);
     }
 
-    private String normalizeRoomState(String pstate, String defaultState) {
-        if (pstate == null || pstate.isBlank()) {
-            return defaultState != null && !defaultState.isBlank() ? defaultState : "11";
+    private void requireDraftRoom(ExamRoom room, String actionName) {
+        if (!ROOM_DRAFT.equals(room.getPstate())) {
+            throw BizException.fail("只有草稿状态的答题室允许" + actionName);
         }
-        if (!"11".equals(pstate) && !"21".equals(pstate) && !"31".equals(pstate)) {
-            throw BizException.fail("答题室状态无效");
-        }
-        return pstate;
     }
 
     private void deleteRoomCards(String roomId) {

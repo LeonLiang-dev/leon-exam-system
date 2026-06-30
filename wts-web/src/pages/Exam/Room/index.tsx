@@ -101,6 +101,19 @@ const RoomPage: React.FC = () => {
     return selectedRows.map((room) => room.id);
   };
 
+  const getSelectedDeletableRoomIds = () => {
+    if (selectedRows.length === 0) {
+      message.warning('请先选择答题室');
+      return null;
+    }
+    const publishedRows = selectedRows.filter((room) => room.pstate === '21');
+    if (publishedRows.length > 0) {
+      message.warning('已发布答题室请先关闭后再删除');
+      return null;
+    }
+    return selectedRows.map((room) => room.id);
+  };
+
   const handleBatchPublish = () => {
     const ids = getSelectedRoomIdsByState('11', '发布');
     if (!ids) return;
@@ -152,11 +165,11 @@ const RoomPage: React.FC = () => {
   };
 
   const handleBatchDelete = () => {
-    const ids = getSelectedRoomIdsByState('11', '删除');
+    const ids = getSelectedDeletableRoomIds();
     if (!ids) return;
     Modal.confirm({
       title: `确定删除选中的 ${ids.length} 个答题室？`,
-      content: '删除答题室会同时移除试卷和参与人员关联。',
+      content: '删除答题室会同时移除试卷、参与人员关联和已产生的答卷。',
       okText: '删除',
       cancelText: '取消',
       okButtonProps: { danger: true },
@@ -265,21 +278,22 @@ const RoomPage: React.FC = () => {
       width: 320,
       render: (_, record) => (
         <Space>
-          <a
-            onClick={() => {
-              setEditingRoom(record);
-              form.setFieldsValue({
-                ...record,
-                publictype: record.publictype || '1',
-                pstate: record.pstate || '11',
-                starttime: parseRoomDateTime(record.starttime),
-                endtime: parseRoomDateTime(record.endtime),
-              });
-              setModalOpen(true);
-            }}
-          >
-            编辑
-          </a>
+          {record.pstate === '11' && (
+            <a
+              onClick={() => {
+                setEditingRoom(record);
+                form.setFieldsValue({
+                  ...record,
+                  publictype: record.publictype || '1',
+                  starttime: parseRoomDateTime(record.starttime),
+                  endtime: parseRoomDateTime(record.endtime),
+                });
+                setModalOpen(true);
+              }}
+            >
+              编辑
+            </a>
+          )}
           {record.pstate === '21' && (
             <a
               style={{ color: '#1890ff' }}
@@ -335,7 +349,7 @@ const RoomPage: React.FC = () => {
               <a style={{ color: '#faad14' }}>关闭</a>
             </Popconfirm>
           )}
-          {record.pstate === '11' && (
+          {record.pstate !== '21' && (
             <Popconfirm
               title="确定删除此答题室？"
               onConfirm={async () => {
@@ -382,12 +396,14 @@ const RoomPage: React.FC = () => {
 
   const handleOk = async () => {
     const values = await form.validateFields();
+    const payload = { ...values };
+    delete payload.pstate;
     try {
       if (editingRoom) {
-        await updateRoom(editingRoom.id, values);
+        await updateRoom(editingRoom.id, payload);
         message.success('更新成功');
       } else {
-        await createRoom(values);
+        await createRoom(payload);
         message.success('创建成功');
       }
       setModalOpen(false);
@@ -534,13 +550,6 @@ const RoomPage: React.FC = () => {
             <Select>
               <Select.Option value="1">公开</Select.Option>
               <Select.Option value="2">指定人员</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="pstate" label="答题室状态" initialValue="11">
-            <Select>
-              <Select.Option value="11">草稿</Select.Option>
-              <Select.Option value="21">已发布</Select.Option>
-              <Select.Option value="31">已关闭</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item
