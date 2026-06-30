@@ -6,9 +6,9 @@
 
 安装后双击 `LeonExam`：
 
-1. 启动内置 MariaDB，仅监听 `127.0.0.1:3307`
+1. 启动内置 MariaDB，仅监听 `127.0.0.1:3307`，端口可在启动器中修改
 2. 首次运行自动创建并导入 `wts` 数据库
-3. 启动 Spring Boot 后端，监听 `8080`
+3. 启动 Spring Boot 后端，默认监听 `8080`，端口可在启动器中修改
 4. 自动打开教师端 `http://127.0.0.1:8080`
 5. 启动器窗口显示学生访问地址，例如 `http://172.18.3.45:8080`
 
@@ -85,6 +85,7 @@ dist\jpackage\
 
 ```text
 C:\ProgramData\LeonExam\
+  config\launcher.properties
   config\application.yml
   mysql\
   logs\
@@ -92,6 +93,29 @@ C:\ProgramData\LeonExam\
 ```
 
 升级程序时不要删除 `C:\ProgramData\LeonExam`，否则会丢失考试数据和上传文件。
+
+## 端口设置
+
+启动器 GUI 提供两个端口设置：
+
+| 配置 | 默认值 | 说明 |
+|------|--------|------|
+| 项目端口 | `8080` | Spring Boot 后端、教师端和学生端访问端口 |
+| 数据库端口 | `3307` | 内置 MariaDB 本机监听端口 |
+
+设置会保存到：
+
+```text
+C:\ProgramData\LeonExam\config\launcher.properties
+```
+
+启动器会根据当前端口自动更新：
+
+```text
+C:\ProgramData\LeonExam\config\application.yml
+```
+
+如果项目端口或数据库端口被占用，启动器会在启动前提示修改端口或关闭占用程序。项目端口修改后，学生访问地址和 Windows 防火墙放行端口也要同步使用新的项目端口。
 
 ## 手动覆盖允许网段
 
@@ -131,6 +155,6 @@ app:
 
 ## 防火墙
 
-教师机需要允许学生访问 TCP `8080`。如果学生浏览器无法打开地址，优先检查 Windows 防火墙或安全软件是否拦截 `LeonExam` / Java 进程。
+教师机需要允许学生访问启动器中配置的项目端口，默认是 TCP `8080`。如果学生浏览器无法打开地址，优先检查 Windows 防火墙或安全软件是否拦截 `LeonExam` / Java 进程。
 
-MariaDB 只监听 `127.0.0.1:3307`，不会暴露给学生电脑。
+MariaDB 只监听 `127.0.0.1` 的数据库端口，默认是 `3307`，不会暴露给学生电脑。

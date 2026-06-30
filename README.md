@@ -278,6 +278,36 @@ dist\jpackage\
 - MariaDB 运行时
 - SQL 初始化脚本
 
+### 启动器端口设置
+
+Windows 启动器 GUI 支持自定义端口：
+
+| 配置 | 默认值 | 说明 |
+|------|--------|------|
+| 项目端口 | `8080` | Spring Boot 后端和教师/学生浏览器访问端口 |
+| 数据库端口 | `3307` | 内置 MariaDB 仅监听 `127.0.0.1` 的本机端口 |
+
+端口配置会保存到：
+
+```text
+C:\ProgramData\LeonExam\config\launcher.properties
+```
+
+示例：
+
+```properties
+server.port=8080
+database.port=3307
+```
+
+启动器每次启动时会根据 GUI 中的端口自动更新：
+
+```text
+C:\ProgramData\LeonExam\config\application.yml
+```
+
+如果端口已被占用，启动器会直接提示修改端口或关闭占用程序，不再继续启动 MariaDB 或后端服务。修改项目端口后，学生访问地址和 Windows 防火墙放行端口也要使用新的项目端口。
+
 更多细节见：
 
 - [Windows 教师机安装包文档](docs/windows-teacher-installer.md)
@@ -422,7 +452,7 @@ cd ..
 
 - 学生电脑和教师机是否在同一网段。
 - 启动器显示的学生访问地址是否正确。
-- Windows 防火墙是否放行 TCP `8080`。
+- Windows 防火墙是否放行启动器中配置的项目端口，默认是 TCP `8080`。
 - 是否被安全软件拦截。
 - 是否配置了手动 CIDR，但没有包含学生 IP。
 

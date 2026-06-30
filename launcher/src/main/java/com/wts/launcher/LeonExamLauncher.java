@@ -6,7 +6,9 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSpinner;
 import javax.swing.JTextArea;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import java.awt.BorderLayout;
@@ -21,8 +23,10 @@ import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.URI;
+import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -38,6 +42,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
@@ -45,8 +50,10 @@ import java.util.stream.Stream;
 public final class LeonExamLauncher {
 
     private static final String APP_NAME = "LeonExam";
-    private static final int SERVER_PORT = 8080;
-    private static final int DB_PORT = 3307;
+    private static final int DEFAULT_SERVER_PORT = 8080;
+    private static final int DEFAULT_DATABASE_PORT = 3307;
+    private static final int MIN_PORT = 1024;
+    private static final int MAX_PORT = 65535;
     private static final Duration START_TIMEOUT = Duration.ofSeconds(90);
     private static final String APP_JAR_NAME = "wts-app-2.0.0-SNAPSHOT.jar";
 
@@ -54,6 +61,10 @@ public final class LeonExamLauncher {
     private final JLabel statusLabel = new JLabel("准备启动");
     private final JLabel teacherUrlLabel = new JLabel("-");
     private final JLabel studentUrlLabel = new JLabel("-");
+    private final JSpinner serverPortSpinner = new JSpinner(
+            new SpinnerNumberModel(DEFAULT_SERVER_PORT, MIN_PORT, MAX_PORT, 1));
+    private final JSpinner databasePortSpinner = new JSpinner(
+            new SpinnerNumberModel(DEFAULT_DATABASE_PORT, MIN_PORT, MAX_PORT, 1));
     private final JTextArea logArea = new JTextArea(18, 86);
     private final JButton startButton = new JButton("启动");
     private final JButton stopButton = new JButton("停止");
@@ -62,6 +73,8 @@ public final class LeonExamLauncher {
 
     private final Path appDir;
     private final Path dataRoot;
+    private int serverPort = DEFAULT_SERVER_PORT;
+    private int databasePort = DEFAULT_DATABASE_PORT;
     private Process databaseProcess;
     private Process serverProcess;
 
@@ -69,6 +82,8 @@ public final class LeonExamLauncher {
         this.appDir = resolveAppDir();
         this.dataRoot = resolveDataRoot();
         initUi();
+        loadLauncherSettings();
+        applyPortSettingsToUi();
         Runtime.getRuntime().addShutdownHook(new Thread(this::stopServices));
     }
 
@@ -138,14 +153,20 @@ public final class LeonExamLauncher {
         logArea.setEditable(false);
         logArea.setLineWrap(true);
         logArea.setWrapStyleWord(true);
+        serverPortSpinner.setEditor(new JSpinner.NumberEditor(serverPortSpinner, "#"));
+        databasePortSpinner.setEditor(new JSpinner.NumberEditor(databasePortSpinner, "#"));
 
-        JPanel infoPanel = new JPanel(new GridLayout(3, 2, 8, 6));
+        JPanel infoPanel = new JPanel(new GridLayout(5, 2, 8, 6));
         infoPanel.add(new JLabel("状态"));
         infoPanel.add(statusLabel);
         infoPanel.add(new JLabel("教师端"));
         infoPanel.add(teacherUrlLabel);
         infoPanel.add(new JLabel("学生访问地址"));
         infoPanel.add(studentUrlLabel);
+        infoPanel.add(new JLabel("项目端口"));
+        infoPanel.add(serverPortSpinner);
+        infoPanel.add(new JLabel("数据库端口"));
+        infoPanel.add(databasePortSpinner);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         buttonPanel.add(startButton);
@@ -154,7 +175,7 @@ public final class LeonExamLauncher {
 
         startButton.addActionListener(e -> startAsync());
         stopButton.addActionListener(e -> executor.submit(this::stopServices));
-        openButton.addActionListener(e -> openBrowser("http://127.0.0.1:" + SERVER_PORT));
+        openButton.addActionListener(e -> openBrowser("http://127.0.0.1:" + serverPort));
         stopButton.setEnabled(false);
         openButton.setEnabled(false);
 
@@ -169,8 +190,17 @@ public final class LeonExamLauncher {
     }
 
     private void startAsync() {
+        try {
+            applyPortsFromUi();
+        } catch (Exception e) {
+            appendLog("端口设置无效: " + e.getMessage());
+            setStatus("启动失败");
+            JOptionPane.showMessageDialog(frame, e.getMessage(), "端口设置无效", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         startButton.setEnabled(false);
         stopButton.setEnabled(true);
+        setPortInputsEnabled(false);
         executor.submit(() -> {
             try {
                 startServices();
@@ -178,11 +208,124 @@ public final class LeonExamLauncher {
                 setOpenEnabled(true);
             } catch (Exception e) {
                 appendLog("启动失败: " + e.getMessage());
+                stopServer();
+                stopDatabase();
                 setStatus("启动失败");
-                startButton.setEnabled(true);
-                stopButton.setEnabled(false);
+                SwingUtilities.invokeLater(() -> {
+                    startButton.setEnabled(true);
+                    stopButton.setEnabled(false);
+                    setPortInputsEnabled(true);
+                });
             }
         });
+    }
+
+    private void loadLauncherSettings() {
+        Path configFile = launcherConfigFile();
+        if (!Files.exists(configFile)) {
+            return;
+        }
+
+        Properties properties = new Properties();
+        try (var input = Files.newInputStream(configFile)) {
+            properties.load(input);
+        } catch (IOException e) {
+            appendLog("读取启动器配置失败，使用默认端口: " + e.getMessage());
+            return;
+        }
+
+        serverPort = readPortProperty(properties, "server.port", DEFAULT_SERVER_PORT, "项目端口");
+        databasePort = readPortProperty(properties, "database.port", DEFAULT_DATABASE_PORT, "数据库端口");
+        if (serverPort == databasePort) {
+            appendLog("启动器配置中的项目端口和数据库端口相同，已恢复默认端口。");
+            serverPort = DEFAULT_SERVER_PORT;
+            databasePort = DEFAULT_DATABASE_PORT;
+        }
+    }
+
+    private int readPortProperty(Properties properties, String key, int defaultValue, String label) {
+        String raw = properties.getProperty(key);
+        if (raw == null || raw.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            int port = Integer.parseInt(raw.trim());
+            validatePortRange(port, label);
+            return port;
+        } catch (RuntimeException e) {
+            appendLog(label + "配置无效，使用默认端口 " + defaultValue + ": " + raw);
+            return defaultValue;
+        }
+    }
+
+    private void applyPortSettingsToUi() {
+        serverPortSpinner.setValue(serverPort);
+        databasePortSpinner.setValue(databasePort);
+    }
+
+    private void applyPortsFromUi() throws IOException {
+        int selectedServerPort = spinnerPort(serverPortSpinner, "项目端口");
+        int selectedDatabasePort = spinnerPort(databasePortSpinner, "数据库端口");
+        if (selectedServerPort == selectedDatabasePort) {
+            throw new IllegalArgumentException("项目端口和数据库端口不能相同。");
+        }
+        serverPort = selectedServerPort;
+        databasePort = selectedDatabasePort;
+        saveLauncherSettings();
+    }
+
+    private int spinnerPort(JSpinner spinner, String label) {
+        try {
+            spinner.commitEdit();
+        } catch (java.text.ParseException e) {
+            throw new IllegalArgumentException(label + "必须是有效端口。");
+        }
+        Object value = spinner.getValue();
+        if (!(value instanceof Number number)) {
+            throw new IllegalArgumentException(label + "必须是数字。");
+        }
+        int port = number.intValue();
+        validatePortRange(port, label);
+        return port;
+    }
+
+    private void validatePortRange(int port, String label) {
+        if (port < MIN_PORT || port > MAX_PORT) {
+            throw new IllegalArgumentException(label + "必须在 " + MIN_PORT + "-" + MAX_PORT + " 之间。");
+        }
+    }
+
+    private void saveLauncherSettings() throws IOException {
+        Path configFile = launcherConfigFile();
+        Files.createDirectories(configFile.getParent());
+        String content = """
+                server.port=%d
+                database.port=%d
+                """.formatted(serverPort, databasePort);
+        Files.writeString(configFile, content, StandardCharsets.UTF_8);
+    }
+
+    private Path launcherConfigFile() {
+        return dataRoot.resolve("config").resolve("launcher.properties");
+    }
+
+    private void validatePortAvailability() {
+        if (!isTcpPortAvailable(serverPort)) {
+            throw new IllegalStateException("项目端口 " + serverPort + " 已被占用，请修改项目端口或关闭占用程序。");
+        }
+        if (!isTcpPortAvailable(databasePort)) {
+            throw new IllegalStateException("数据库端口 " + databasePort + " 已被占用，请修改数据库端口或关闭占用程序。");
+        }
+    }
+
+    private boolean isTcpPortAvailable(int port) {
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.setReuseAddress(false);
+            socket.bind(new InetSocketAddress(port));
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private void startServices() throws Exception {
@@ -203,6 +346,9 @@ public final class LeonExamLauncher {
         requireFile(mariaDbDir.resolve("bin").resolve(executable("mysqld")), "MariaDB mysqld");
         requireFile(mariaDbDir.resolve("bin").resolve(executable("mysql")), "MariaDB mysql client");
 
+        appendLog("端口设置: 项目端口=" + serverPort + ", 数据库端口=" + databasePort);
+        validatePortAvailability();
+
         boolean existingDatabase = initDatabaseFiles(mariaDbDir);
         startDatabase(mariaDbDir);
         waitForDatabase(mariaDbDir);
@@ -212,14 +358,14 @@ public final class LeonExamLauncher {
         startServer(appJar, configFile);
         waitForServer();
 
-        String teacherUrl = "http://127.0.0.1:" + SERVER_PORT;
+        String teacherUrl = "http://127.0.0.1:" + serverPort;
         String studentUrl = detectLanAddress()
-                .map(ip -> "http://" + ip + ":" + SERVER_PORT)
+                .map(ip -> "http://" + ip + ":" + serverPort)
                 .orElse("未检测到局域网 IPv4 地址");
         setUrls(teacherUrl, studentUrl);
         appendLog("教师端地址: " + teacherUrl);
         appendLog("学生访问地址: " + studentUrl);
-        appendLog("若学生无法访问，请在 Windows 防火墙中放行 TCP " + SERVER_PORT + " 端口。");
+        appendLog("若学生无法访问，请在 Windows 防火墙中放行 TCP " + serverPort + " 端口。");
         openBrowser(teacherUrl);
     }
 
@@ -313,7 +459,7 @@ public final class LeonExamLauncher {
                 "--no-defaults",
                 "--basedir=" + mariaDbDir,
                 "--datadir=" + mysqlData,
-                "--port=" + DB_PORT,
+                "--port=" + databasePort,
                 "--bind-address=127.0.0.1",
                 "--character-set-server=utf8mb4",
                 "--collation-server=utf8mb4_general_ci",
@@ -334,7 +480,7 @@ public final class LeonExamLauncher {
             int code = runCommandNoThrow(List.of(mysqlAdmin.toString(),
                     "--protocol=tcp",
                     "--host=127.0.0.1",
-                    "--port=" + DB_PORT,
+                    "--port=" + databasePort,
                     "--user=root",
                     "ping"), mariaDbDir);
             if (code == 0) {
@@ -434,11 +580,11 @@ public final class LeonExamLauncher {
         String uploads = dataRoot.resolve("uploads").toString().replace("\\", "/");
         String yaml = """
                 server:
-                  port: 8080
+                  port: %d
 
                 spring:
                   datasource:
-                    url: jdbc:mysql://127.0.0.1:3307/wts?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+                    url: jdbc:mysql://127.0.0.1:%d/wts?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
                     username: root
                     password: ""
 
@@ -451,7 +597,7 @@ public final class LeonExamLauncher {
                       enabled: true
                       auto-same-subnet: true
                       allowed-cidrs: ""
-                """.formatted(uploads);
+                """.formatted(serverPort, databasePort, uploads);
         Files.writeString(configFile, yaml, StandardCharsets.UTF_8);
         appendLog("已创建默认配置文件: " + configFile);
         return configFile;
@@ -459,13 +605,62 @@ public final class LeonExamLauncher {
 
     private void repairApplicationConfig(Path configFile) throws IOException {
         String content = Files.readString(configFile, StandardCharsets.UTF_8);
-        String repaired = content
+        String repaired = upsertServerPort(content)
                 .replace("characterEncoding=utf8mb4", "characterEncoding=UTF-8")
-                .replace("characterEncoding=utf8", "characterEncoding=UTF-8");
+                .replace("characterEncoding=utf8", "characterEncoding=UTF-8")
+                .replaceAll("jdbc:mysql://127\\.0\\.0\\.1:\\d+/wts",
+                        "jdbc:mysql://127.0.0.1:" + databasePort + "/wts");
         if (!content.equals(repaired)) {
             Files.writeString(configFile, repaired, StandardCharsets.UTF_8);
-            appendLog("已修复配置文件中的 JDBC 字符编码参数。");
+            appendLog("已修复配置文件中的端口和 JDBC 字符编码参数。");
         }
+    }
+
+    private String upsertServerPort(String content) {
+        String lineSeparator = content.contains("\r\n") ? "\r\n" : "\n";
+        String[] lines = content.split("\\R", -1);
+        boolean inServerBlock = false;
+        int serverLine = -1;
+
+        for (int i = 0; i < lines.length; i++) {
+            String trimmed = lines[i].trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            int indent = leadingSpaces(lines[i]);
+            if (indent == 0 && "server:".equals(trimmed)) {
+                inServerBlock = true;
+                serverLine = i;
+                continue;
+            }
+            if (inServerBlock) {
+                if (indent == 0) {
+                    break;
+                }
+                if (trimmed.startsWith("port:")) {
+                    lines[i] = "  port: " + serverPort;
+                    return String.join(lineSeparator, lines);
+                }
+            }
+        }
+
+        if (serverLine >= 0) {
+            List<String> result = new ArrayList<>(List.of(lines));
+            result.add(serverLine + 1, "  port: " + serverPort);
+            return String.join(lineSeparator, result);
+        }
+        return "server:" + lineSeparator
+                + "  port: " + serverPort + lineSeparator
+                + lineSeparator
+                + content;
+    }
+
+    private int leadingSpaces(String value) {
+        int count = 0;
+        while (count < value.length() && value.charAt(count) == ' ') {
+            count++;
+        }
+        return count;
     }
 
     private void startServer(Path appJar, Path configFile) throws IOException {
@@ -512,7 +707,7 @@ public final class LeonExamLauncher {
 
     private void waitForServer() throws Exception {
         long deadline = System.currentTimeMillis() + START_TIMEOUT.toMillis();
-        URL url = URI.create("http://127.0.0.1:" + SERVER_PORT + "/api/v1/health").toURL();
+        URL url = URI.create("http://127.0.0.1:" + serverPort + "/api/v1/health").toURL();
         while (System.currentTimeMillis() < deadline) {
             try {
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -535,8 +730,11 @@ public final class LeonExamLauncher {
         stopServer();
         stopDatabase();
         setStatus("已停止");
-        startButton.setEnabled(true);
-        stopButton.setEnabled(false);
+        SwingUtilities.invokeLater(() -> {
+            startButton.setEnabled(true);
+            stopButton.setEnabled(false);
+            setPortInputsEnabled(true);
+        });
     }
 
     private void stopServer() {
@@ -554,21 +752,21 @@ public final class LeonExamLauncher {
     }
 
     private void stopDatabase() {
-        Path mariaDbDir = appDir.resolve("mariadb");
-        Path mysqlAdmin = mariaDbDir.resolve("bin").resolve(executable("mysqladmin"));
-        if (Files.exists(mysqlAdmin)) {
-            try {
-                runCommandNoThrow(List.of(mysqlAdmin.toString(),
-                        "--protocol=tcp",
-                        "--host=127.0.0.1",
-                        "--port=" + DB_PORT,
-                        "--user=root",
-                        "shutdown"), mariaDbDir);
-            } catch (Exception ignored) {
-                // Fall through to process destroy.
-            }
-        }
         if (databaseProcess != null && databaseProcess.isAlive()) {
+            Path mariaDbDir = appDir.resolve("mariadb");
+            Path mysqlAdmin = mariaDbDir.resolve("bin").resolve(executable("mysqladmin"));
+            if (Files.exists(mysqlAdmin)) {
+                try {
+                    runCommandNoThrow(List.of(mysqlAdmin.toString(),
+                            "--protocol=tcp",
+                            "--host=127.0.0.1",
+                            "--port=" + databasePort,
+                            "--user=root",
+                            "shutdown"), mariaDbDir);
+                } catch (Exception ignored) {
+                    // Fall through to process destroy.
+                }
+            }
             appendLog("正在停止 MariaDB...");
             databaseProcess.destroy();
             try {
@@ -587,7 +785,7 @@ public final class LeonExamLauncher {
         command.add(mariaDbDir.resolve("bin").resolve(executable("mysql")).toString());
         command.add("--protocol=tcp");
         command.add("--host=127.0.0.1");
-        command.add("--port=" + DB_PORT);
+        command.add("--port=" + databasePort);
         command.add("--user=root");
         command.addAll(extraArgs);
         if (database != null) {
@@ -744,6 +942,13 @@ public final class LeonExamLauncher {
 
     private void setOpenEnabled(boolean enabled) {
         SwingUtilities.invokeLater(() -> openButton.setEnabled(enabled));
+    }
+
+    private void setPortInputsEnabled(boolean enabled) {
+        SwingUtilities.invokeLater(() -> {
+            serverPortSpinner.setEnabled(enabled);
+            databasePortSpinner.setEnabled(enabled);
+        });
     }
 
     private void appendLog(String message) {
