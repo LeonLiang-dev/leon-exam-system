@@ -116,25 +116,6 @@ public class SubjectImportServiceImpl implements SubjectImportService {
                     }
                 }
             }
-
-            // Sheet 5: Fileup (附件题)
-            if (workbook.getNumberOfSheets() > 4) {
-                Sheet sheet = workbook.getSheetAt(4);
-                for (int i = 1; i <= sheet.getLastRowNum(); i++) {
-                    Row row = sheet.getRow(i);
-                    if (row == null) continue;
-                    String text = getStringCell(row, 1);
-                    if (text == null || text.isBlank()) continue;
-                    total++;
-
-                    try {
-                        importEssay(typeid, text, "6", row, operatorId, operatorName);
-                        success++;
-                    } catch (Exception e) {
-                        errors.add("附件题第" + (i + 1) + "行: " + e.getMessage());
-                    }
-                }
-            }
         } catch (IOException e) {
             throw com.wts.common.exception.BizException.fail("读取Excel文件失败: " + e.getMessage());
         }
@@ -152,6 +133,7 @@ public class SubjectImportServiceImpl implements SubjectImportService {
         dto.setTiptype(tiptype);
         dto.setTipstr(text);
         dto.setLevel(getIntCell(row, 9) != null ? getIntCell(row, 9) : 1);
+        dto.setPoint(1);
 
         String rightStr = getStringCell(row, 8);
         List<Integer> rightIndexes = parseRightAnswers(rightStr);
@@ -176,6 +158,7 @@ public class SubjectImportServiceImpl implements SubjectImportService {
         dto.setTiptype("4");
         dto.setTipstr(text);
         dto.setLevel(getIntCell(row, 6) != null ? getIntCell(row, 6) : 1);
+        dto.setPoint(1);
 
         String right = getStringCell(row, 2);
         boolean isCorrect = "对".equals(right != null ? right.trim() : "");
@@ -202,6 +185,7 @@ public class SubjectImportServiceImpl implements SubjectImportService {
         dto.setTiptype("1");
         dto.setTipstr(text);
         dto.setLevel(getIntCell(row, 11) != null ? getIntCell(row, 11) : 1);
+        dto.setPoint(1);
 
         List<AnswerDTO> answers = new ArrayList<>();
         for (int col = 2; col <= 7; col++) {
@@ -222,6 +206,7 @@ public class SubjectImportServiceImpl implements SubjectImportService {
         dto.setTypeid(typeid);
         dto.setTiptype(tiptype);
         dto.setTipstr(text);
+        dto.setPoint(1);
         dto.setAnswers(Collections.emptyList());
         subjectService.create(dto, operatorId, operatorName);
     }
@@ -237,16 +222,14 @@ public class SubjectImportServiceImpl implements SubjectImportService {
             Sheet judgeSheet = workbook.createSheet("判断题");
             Sheet vacancySheet = workbook.createSheet("填空题");
             Sheet essaySheet = workbook.createSheet("问答题");
-            Sheet fileupSheet = workbook.createSheet("附件题");
 
             // Headers
             createHeaderRow(selectSheet, workbook, "题型", "题目描述", "选项A", "选项B", "选项C", "选项D", "选项E", "选项F", "答案", "难度");
             createHeaderRow(judgeSheet, workbook, "题型", "题目描述", "答案", "难度");
             createHeaderRow(vacancySheet, workbook, "题型", "题目描述", "空1答案", "空2答案", "空3答案", "空4答案", "空5答案", "空6答案", "难度");
             createHeaderRow(essaySheet, workbook, "题型", "题目描述", "难度");
-            createHeaderRow(fileupSheet, workbook, "题型", "题目描述", "难度");
 
-            int selectRow = 1, judgeRow = 1, vacancyRow = 1, essayRow = 1, fileupRow = 1;
+            int selectRow = 1, judgeRow = 1, vacancyRow = 1, essayRow = 1;
 
             for (ExamSubject subject : subjects) {
                 ExamSubjectVersion version = versionMapper.selectById(subject.getVersionid());
@@ -309,13 +292,8 @@ public class SubjectImportServiceImpl implements SubjectImportService {
                         r.createCell(2).setCellValue(subject.getLevel() != null ? subject.getLevel() : 1);
                         break;
                     }
-                    case FILEUP: {
-                        Row r = fileupSheet.createRow(fileupRow++);
-                        r.createCell(0).setCellValue("附件");
-                        r.createCell(1).setCellValue(version.getTipstr() != null ? version.getTipstr() : "");
-                        r.createCell(2).setCellValue(subject.getLevel() != null ? subject.getLevel() : 1);
+                    case FILEUP:
                         break;
-                    }
                 }
             }
 

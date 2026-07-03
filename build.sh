@@ -12,7 +12,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$PROJECT_DIR/wts-web"
 SERVER_DIR="$PROJECT_DIR/wts-server"
 STATIC_DIR="$SERVER_DIR/wts-app/src/main/resources/static"
-JAR_NAME="wts-app-2.0.0-SNAPSHOT.jar"
+JAR_NAME="wts-app-3.0.0-SNAPSHOT.jar"
 JAR_PATH="$SERVER_DIR/wts-app/target/$JAR_NAME"
 DIST_DIR="$PROJECT_DIR/dist"
 
@@ -82,11 +82,12 @@ echo "=========================================="
 if [ "$1" = "package" ]; then
     echo ""
     echo "正在生成本机安装包 (jpackage)..."
-    JPACAKGE_DIR="$DIST_DIR/jpackage"
-    mkdir -p "$JPACAKGE_DIR"
+    JPACKAGE_DIR="$DIST_DIR/jpackage"
+    rm -rf "$JPACKAGE_DIR/LeonExam.app" "$JPACKAGE_DIR/app"
+    mkdir -p "$JPACKAGE_DIR"
 
     # 先解压 JAR 到 app 目录（jpackage 需要）
-    APP_DIR="$JPACAKGE_DIR/app"
+    APP_DIR="$JPACKAGE_DIR/app"
     mkdir -p "$APP_DIR"
     cp "$JAR_PATH" "$APP_DIR/"
 
@@ -96,22 +97,22 @@ if [ "$1" = "package" ]; then
     jpackage \
         --name LeonExam \
         --type app-image \
-        --dest "$JPACAKGE_DIR" \
+        --dest "$JPACKAGE_DIR" \
         --input "$APP_DIR" \
         --main-jar "$JAR_NAME" \
         --main-class org.springframework.boot.loader.launch.JarLauncher \
         --java-options "-Dspring.profiles.active=prod" \
         --java-options "-Xms256m" \
         --java-options "-Xmx1024m" \
-        --app-version "2.0.0" \
+        --app-version "3.0.0" \
         --description "Leon在线考试系统" \
         --vendor "Leon"
 
     echo ""
     echo "=========================================="
     echo "  本机安装包已生成!"
-    echo "  位置: $JPACAKGE_DIR/LeonExam/"
+    echo "  位置: $JPACKAGE_DIR/LeonExam.app/"
     echo ""
-    echo "  运行: $JPACAKGE_DIR/LeonExam/bin/LeonExam"
+    echo "  运行: open $JPACKAGE_DIR/LeonExam.app"
     echo "=========================================="
 fi

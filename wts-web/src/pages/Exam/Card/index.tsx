@@ -84,23 +84,47 @@ const ExamCardPage: React.FC = () => {
       switch (subject.tiptype) {
         case '2':
         case '4':
-          submitAnswers.push({ answerid: val, versionid: subject.versionId, valstr: 'true' });
+          for (const answer of subject.answers || []) {
+            submitAnswers.push({
+              answerid: answer.id,
+              versionid: subject.versionId,
+              valstr: answer.id === val ? 'true' : 'false',
+            });
+          }
           break;
         case '3':
-          for (const answerId of (val as string[])) {
-            submitAnswers.push({ answerid: answerId, versionid: subject.versionId, valstr: 'true' });
+          {
+            const selected = Array.isArray(val) ? val : [];
+            for (const answer of subject.answers || []) {
+              submitAnswers.push({
+                answerid: answer.id,
+                versionid: subject.versionId,
+                valstr: selected.includes(answer.id) ? 'true' : 'false',
+              });
+            }
           }
           break;
         case '1':
           if (typeof val === 'object') {
-            for (const [answerId, text] of Object.entries(val)) {
-              submitAnswers.push({ answerid: answerId, versionid: subject.versionId, valstr: text as string });
+            for (const answer of subject.answers || []) {
+              submitAnswers.push({
+                answerid: answer.id,
+                versionid: subject.versionId,
+                valstr: (val as Record<string, string>)[answer.id] || '',
+              });
             }
           }
           break;
         case '5':
           if (subject.answers?.[0]) {
-            submitAnswers.push({ answerid: subject.answers[0].id, versionid: subject.versionId, valstr: val as string });
+            const normalized = val && typeof val === 'object'
+              ? { text: val.text || '', images: Array.isArray(val.images) ? val.images : [] }
+              : { text: typeof val === 'string' ? val : '', images: [] };
+            submitAnswers.push({
+              answerid: subject.answers[0].id,
+              versionid: subject.versionId,
+              valstr: JSON.stringify(normalized),
+            });
           }
           break;
       }
@@ -199,7 +223,17 @@ const ExamCardPage: React.FC = () => {
               if (Object.keys(obj).length > 0) restored[versionId] = obj;
             } else if (tiptype === '5') {
               const text = ans[0]?.valstr;
-              if (text) restored[versionId] = text;
+              if (text) {
+                try {
+                  const parsed = JSON.parse(text);
+                  restored[versionId] = {
+                    text: parsed?.text || '',
+                    images: Array.isArray(parsed?.images) ? parsed.images : [],
+                  };
+                } catch {
+                  restored[versionId] = { text, images: [] };
+                }
+              }
             }
           }
           setAnswers(restored);
@@ -257,7 +291,12 @@ const ExamCardPage: React.FC = () => {
       if (typeof val === 'string' && val.length > 0) answeredSet.add(subject.versionId);
       else if (Array.isArray(val) && val.length > 0) answeredSet.add(subject.versionId);
       else if (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0) {
-        answeredSet.add(subject.versionId);
+        const hasTextValue = Object.values(val).some((item: any) => {
+          if (typeof item === 'string') return item.trim().length > 0;
+          if (Array.isArray(item)) return item.length > 0;
+          return Boolean(item);
+        });
+        if (hasTextValue) answeredSet.add(subject.versionId);
       }
     }
   }

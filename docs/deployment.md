@@ -29,6 +29,7 @@ mysql -u root -p -e "CREATE DATABASE wts DEFAULT CHARACTER SET utf8mb4 COLLATE u
 # 导入数据
 mysql -u root -p wts < sql/init/wts.v1.4.1.sql
 mysql -u root -p wts < sql/migrations/V2_add_point_column.sql
+mysql -u root -p wts < sql/migrations/V10_question_type_spec_reset.sql
 ```
 
 #### 2. 后端
@@ -78,7 +79,7 @@ chmod +x build.sh
 # 部署运行
 CORS_ALLOWED_ORIGIN_PATTERNS=https://exam.example.com \
 JWT_SECRET=替换为至少32字节的随机密钥 \
-java -jar dist/wts-app-2.0.0-SNAPSHOT.jar --spring.profiles.active=prod
+java -jar dist/wts-app-3.0.0-SNAPSHOT.jar --spring.profiles.active=prod
 ```
 
 **生产配置（application-prod.yml）：**
@@ -121,7 +122,7 @@ server {
 ```dockerfile
 # Dockerfile (参考)
 FROM eclipse-temurin:17-jre-alpine
-COPY dist/wts-app-2.0.0-SNAPSHOT.jar /app/app.jar
+COPY dist/wts-app-3.0.0-SNAPSHOT.jar /app/app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar", "--spring.profiles.active=prod"]
 ```

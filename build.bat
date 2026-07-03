@@ -17,9 +17,9 @@ set "SERVER_DIR=%PROJECT_DIR%wts-server"
 set "LAUNCHER_DIR=%PROJECT_DIR%launcher"
 set "MARIADB_SOURCE_DIR=%PROJECT_DIR%packaging\windows\mariadb"
 set "STATIC_DIR=%SERVER_DIR%\wts-app\src\main\resources\static"
-set "JAR_NAME=wts-app-2.0.0-SNAPSHOT.jar"
+set "JAR_NAME=wts-app-3.0.0-SNAPSHOT.jar"
 set "JAR_PATH=%SERVER_DIR%\wts-app\target\%JAR_NAME%"
-set "LAUNCHER_JAR=%LAUNCHER_DIR%\target\leon-exam-launcher-2.0.0.jar"
+set "LAUNCHER_JAR=%LAUNCHER_DIR%\target\leon-exam-launcher-3.0.0.jar"
 set "DIST_DIR=%PROJECT_DIR%dist"
 set "JPACKAGE_DIR=%DIST_DIR%\jpackage"
 set "PAYLOAD_DIR=%DIST_DIR%\windows-payload"
@@ -27,7 +27,7 @@ set "RUNTIME_DIR=%DIST_DIR%\runtime-image"
 set "PACKAGE_MODE=0"
 set "INSTALLER_TYPE=msi"
 set "WIN_CONSOLE_OPTION="
-set "APP_VERSION=2.0.17"
+set "APP_VERSION=3.0.0"
 set "WIN_UPGRADE_UUID=B7049603-F325-4AC9-B9E2-46CA1AA46E95"
 
 echo ==========================================
@@ -345,6 +345,11 @@ if not exist "%PROJECT_DIR%sql\migrations\V8_fix_exam_create_defaults.sql" (
 
 if not exist "%PROJECT_DIR%sql\migrations\V9_cleanup_orphan_cards.sql" (
     echo ERROR: Missing migration SQL: "%PROJECT_DIR%sql\migrations\V9_cleanup_orphan_cards.sql"
+    exit /b 1
+)
+
+if not exist "%PROJECT_DIR%sql\migrations\V10_question_type_spec_reset.sql" (
+    echo ERROR: Missing migration SQL: "%PROJECT_DIR%sql\migrations\V10_question_type_spec_reset.sql"
     exit /b 1
 )
 

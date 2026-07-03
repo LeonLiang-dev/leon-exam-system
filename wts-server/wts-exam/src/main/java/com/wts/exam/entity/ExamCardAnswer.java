@@ -21,4 +21,9 @@ public class ExamCardAnswer implements Serializable {
     private String ctime;
     private String pcontent;
     private String pstate;
+    private Integer point;
+    private Integer mpoint;
+    private String reviewRequired;
+    private String reviewReason;
+    private String reviewComment;
 }

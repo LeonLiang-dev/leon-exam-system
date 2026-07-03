@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, history } from '@umijs/max';
-import { Button, message, Spin, Card, InputNumber, Tag, Space, Divider, Modal } from 'antd';
+import { Button, message, Spin, Card, Input, InputNumber, Tag, Space, Divider, Modal } from 'antd';
 import { getCardPaperForReview, getCardResult, judgeCard } from '@/services/exam';
 import AnswerValueView, { getCardAnswerDisplayValue } from './AnswerValueView';
 
 const TIPTYPE_LABELS: Record<string, string> = {
   '1': '填空题', '2': '单选题', '3': '多选题',
-  '4': '判断题', '5': '问答题', '6': '附件题',
+  '4': '判断题', '5': '主观题',
 };
 
 const JudgePage: React.FC = () => {
@@ -15,6 +15,9 @@ const JudgePage: React.FC = () => {
   const [paperData, setPaperData] = useState<any>(null);
   const [resultData, setResultData] = useState<any>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [answerScores, setAnswerScores] = useState<Record<string, number>>({});
+  const [scoreComments, setScoreComments] = useState<Record<string, string>>({});
+  const [answerComments, setAnswerComments] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -24,10 +27,25 @@ const JudgePage: React.FC = () => {
         setResultData(resultRes.data);
         // Initialize scores from existing points (normalize key to camelCase)
         const existingScores: Record<string, number> = {};
+        const existingScoreComments: Record<string, string> = {};
         for (const p of resultRes.data?.points || []) {
-          existingScores[p.versionid || p.versionId] = p.point || 0;
+          const versionId = p.versionid || p.versionId;
+          existingScores[versionId] = p.point || 0;
+          existingScoreComments[versionId] = p.reviewComment || p.reviewcomment || '';
         }
         setScores(existingScores);
+        setScoreComments(existingScoreComments);
+        const existingAnswerScores: Record<string, number> = {};
+        const existingAnswerComments: Record<string, string> = {};
+        for (const a of resultRes.data?.answers || []) {
+          const versionId = a.versionid || a.versionId;
+          const answerId = a.answerid || a.answerId;
+          const key = `${versionId}|${answerId}`;
+          existingAnswerScores[key] = a.point || 0;
+          existingAnswerComments[key] = a.reviewComment || a.reviewcomment || '';
+        }
+        setAnswerScores(existingAnswerScores);
+        setAnswerComments(existingAnswerComments);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -72,23 +90,57 @@ const JudgePage: React.FC = () => {
     setScores((prev) => ({ ...prev, [versionId]: value ?? 0 }));
   };
 
+  const handleScoreCommentChange = (versionId: string, value: string) => {
+    setScoreComments((prev) => ({ ...prev, [versionId]: value }));
+  };
+
+  const handleAnswerScoreChange = (versionId: string, answerId: string, value: number | null) => {
+    setAnswerScores((prev) => ({ ...prev, [`${versionId}|${answerId}`]: value ?? 0 }));
+  };
+
+  const handleAnswerCommentChange = (versionId: string, answerId: string, value: string) => {
+    setAnswerComments((prev) => ({ ...prev, [`${versionId}|${answerId}`]: value }));
+  };
+
   // Collect manual-type subject versionIds
   const manualVersionIds = new Set<string>();
   for (const ch of paperData.chapters || []) {
     for (const s of ch.subjects || []) {
-      if (s.tiptype === '5' || s.tiptype === '6') {
+      if (s.tiptype === '5') {
         manualVersionIds.add(s.versionId);
       }
     }
   }
 
   const handleSubmit = async () => {
-    // Only send scores for manual-type questions
     const points = Object.entries(scores)
       .filter(([versionId]) => manualVersionIds.has(versionId))
-      .map(([versionId, point]) => ({ versionId, point }));
+      .map(([versionId, point]) => ({
+        versionId,
+        point,
+        reviewComment: scoreComments[versionId] || '',
+      }));
+    const answerPoints: any[] = [];
+    for (const subject of allSubjects) {
+      const pointInfo = pointMap[subject.versionId];
+      const reviewRequired = (pointInfo?.reviewRequired || pointInfo?.reviewrequired) === '1';
+      if (subject.tiptype !== '1' || !reviewRequired) continue;
+      for (const answer of answerMap[subject.versionId] || []) {
+        const answerId = answer.answerid || answer.answerId;
+        const key = `${subject.versionId}|${answerId}`;
+        const answerReviewRequired = (answer.reviewRequired || answer.reviewrequired) === '1';
+        if (answerReviewRequired) {
+          answerPoints.push({
+            versionId: subject.versionId,
+            answerId,
+            point: answerScores[key] || 0,
+            reviewComment: answerComments[key] || '',
+          });
+        }
+      }
+    }
 
-    if (points.length === 0) {
+    if (points.length === 0 && answerPoints.length === 0) {
       message.warning('没有需要人工评分的题目');
       return;
     }
@@ -102,7 +154,7 @@ const JudgePage: React.FC = () => {
         content: `还有 ${unscored.length} 道题未评分（将按0分计算），确定提交吗？`,
         onOk: async () => {
           try {
-            await judgeCard(id!, { points });
+            await judgeCard(id!, { points, answerPoints });
             message.success('阅卷完成');
             history.push(`/exam/card/${id}/result`);
           } catch {
@@ -114,7 +166,7 @@ const JudgePage: React.FC = () => {
     }
 
     try {
-      await judgeCard(id!, { points });
+      await judgeCard(id!, { points, answerPoints });
       message.success('阅卷完成');
       history.push(`/exam/card/${id}/result`);
     } catch {
@@ -135,7 +187,9 @@ const JudgePage: React.FC = () => {
       {allSubjects.map((subject, index) => {
         const userAnswers = answerMap[subject.versionId] || [];
         const pointInfo = pointMap[subject.versionId];
-        const isManualType = subject.tiptype === '5' || subject.tiptype === '6';
+        const reviewRequired = (pointInfo?.reviewRequired || pointInfo?.reviewrequired) === '1';
+        const isSubjective = subject.tiptype === '5';
+        const isFillReview = subject.tiptype === '1' && reviewRequired;
 
         return (
           <Card
@@ -155,7 +209,7 @@ const JudgePage: React.FC = () => {
               <strong>题目：</strong>{subject.tipstr || subject.introduction}
             </div>
 
-            {isManualType ? (
+            {isSubjective ? (
               <>
                 <div className="wts-judge-answer-box">
                   <strong>用户答案：</strong>
@@ -181,6 +235,63 @@ const JudgePage: React.FC = () => {
                     style={{ width: 120 }}
                   />
                   <span style={{ color: '#999' }}>/ {subject.point}分</span>
+                </div>
+                <Input.TextArea
+                  rows={3}
+                  maxLength={512}
+                  showCount
+                  placeholder="批注（可选）"
+                  value={scoreComments[subject.versionId] || ''}
+                  onChange={(event) => handleScoreCommentChange(subject.versionId, event.target.value)}
+                />
+              </>
+            ) : isFillReview ? (
+              <>
+                <div className="wts-judge-answer-box">
+                  <strong>填空复核：</strong>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {(subject.answers || []).map((standard: any, blankIndex: number) => {
+                      const userAnswer = userAnswers.find((a: any) => (a.answerid || a.answerId) === standard.id);
+                      const answerId = standard.id;
+                      const key = `${subject.versionId}|${answerId}`;
+                      const maxPoint = userAnswer?.mpoint ?? userAnswer?.mPoint ?? 0;
+                      const answerReviewRequired = (userAnswer?.reviewRequired || userAnswer?.reviewrequired) === '1';
+                      return (
+                        <div key={answerId} style={{ padding: 10, border: '1px solid #f0f0f0', borderRadius: 4 }}>
+                          <Space wrap align="center">
+                            <Tag>第 {blankIndex + 1} 空</Tag>
+                            <span>学生答案：</span>
+                            <AnswerValueView value={userAnswer?.valstr} />
+                            <span>标准答案：</span>
+                            <Tag color="blue">{standard.answer}</Tag>
+                            {answerReviewRequired ? <Tag color="orange">待复核</Tag> : <Tag color="green">已自动判分</Tag>}
+                          </Space>
+                          <div style={{ marginTop: 8 }}>
+                            <span>该空评分：</span>
+                            <InputNumber
+                              min={0}
+                              max={maxPoint}
+                              value={answerScores[key] || 0}
+                              disabled={!answerReviewRequired}
+                              onChange={(val) => handleAnswerScoreChange(subject.versionId, answerId, val)}
+                              style={{ width: 120, marginLeft: 8, marginRight: 8 }}
+                            />
+                            <span style={{ color: '#999' }}>/ {maxPoint}分</span>
+                          </div>
+                          <Input.TextArea
+                            rows={2}
+                            maxLength={512}
+                            showCount
+                            disabled={!answerReviewRequired}
+                            placeholder="批注（可选）"
+                            value={answerComments[key] || ''}
+                            onChange={(event) => handleAnswerCommentChange(subject.versionId, answerId, event.target.value)}
+                            style={{ marginTop: 8 }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </>
             ) : (

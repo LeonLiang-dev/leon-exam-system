@@ -138,6 +138,7 @@ mysql -u root -p -e "CREATE DATABASE wts DEFAULT CHARACTER SET utf8mb4 COLLATE u
 mysql -u root -p wts < sql/init/wts.empty.sql
 mysql -u root -p wts < sql/init/wts.clean-seed.sql
 mysql -u root -p wts < sql/migrations/V2_add_point_column.sql
+mysql -u root -p wts < sql/migrations/V10_question_type_spec_reset.sql
 ```
 
 如果需要参考原始 WTS 演示/历史数据，可手动导入完整初始化脚本：
@@ -145,6 +146,7 @@ mysql -u root -p wts < sql/migrations/V2_add_point_column.sql
 ```bash
 mysql -u root -p wts < sql/init/wts.v1.4.1.sql
 mysql -u root -p wts < sql/migrations/V2_add_point_column.sql
+mysql -u root -p wts < sql/migrations/V10_question_type_spec_reset.sql
 ```
 
 ### 3. 配置后端数据库
@@ -170,7 +172,7 @@ spring:
 ```bash
 cd wts-server
 mvn clean package -DskipTests
-java -jar wts-app/target/wts-app-2.0.0-SNAPSHOT.jar --spring.profiles.active=dev
+java -jar wts-app/target/wts-app-3.0.0-SNAPSHOT.jar --spring.profiles.active=dev
 ```
 
 后端默认地址：
@@ -216,7 +218,7 @@ http://localhost:8000
 
 - Windows 教师机安装包默认使用 `wts.empty.sql` + `wts.clean-seed.sql` 初始化，首次安装只保留内置管理员，不包含题目、试卷、答题室、学生和答卷演示数据。
 - `wts.v1.4.1.sql` 仅作为原始 WTS 数据参考或手工演示库使用。
-- 如果某台机器已经初始化过演示数据，升级安装包不会自动清库；从 `2.0.16` 起可删除 `C:\ProgramData\LeonExam\mysql` 后重新初始化，或手工执行 `sql/maintenance/reset_to_clean_admin.sql`。
+- 如果某台机器已经初始化过演示数据，升级安装包不会自动清库；从 `3.0.0` 起可删除 `C:\ProgramData\LeonExam\mysql` 后重新初始化，或手工执行 `sql/maintenance/reset_to_clean_admin.sql`。
 
 ## 默认账号
 
@@ -377,7 +379,7 @@ Windows：
 构建产物：
 
 ```text
-dist/wts-app-2.0.0-SNAPSHOT.jar
+dist/wts-app-3.0.0-SNAPSHOT.jar
 ```
 
 ### 后端测试

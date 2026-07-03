@@ -8,7 +8,7 @@ import AnswerValueView, { getCardAnswerDisplayValue } from './AnswerValueView';
 
 const TIPTYPE_LABELS: Record<string, string> = {
   '1': '填空题', '2': '单选题', '3': '多选题',
-  '4': '判断题', '5': '问答题', '6': '附件题',
+  '4': '判断题', '5': '主观题',
 };
 
 const PSTATE_MAP: Record<string, { text: string; color: string }> = {
@@ -146,10 +146,14 @@ const ExamResultPage: React.FC = () => {
           const earnedPoint = pointInfo.point || 0;
           const maxPoint = pointInfo.mpoint || 0;
           const isCorrect = earnedPoint > 0 && maxPoint > 0;
-          // Answered but scored 0 while card not yet judged → might be pending manual grading
-          const isPending = card?.pstate === '16' && earnedPoint === 0 && pointInfo.complete === '1';
+          const reviewRequired = (pointInfo.reviewRequired || pointInfo.reviewrequired) === '1';
+          const isPending = card?.pstate === '16' && (reviewRequired || pointInfo.complete === '1');
           const isWrong = !isCorrect && !isPending && pointInfo.complete === '1' && earnedPoint === 0;
           const isUnanswered = pointInfo.complete !== '1';
+          const pointComment = pointInfo.reviewComment || pointInfo.reviewcomment || '';
+          const answerComments = cardAns
+            .map((answer: any) => answer.reviewComment || answer.reviewcomment)
+            .filter((comment: string | undefined) => Boolean(comment));
 
           return (
             <div
@@ -184,6 +188,16 @@ const ExamResultPage: React.FC = () => {
                   <span style={{ color: '#999' }}>未作答</span>
                 )}
               </div>
+              {pointComment && (
+                <div style={{ marginTop: 8, color: '#666' }}>
+                  阅卷批注：{pointComment}
+                </div>
+              )}
+              {answerComments.length > 0 && (
+                <div style={{ marginTop: 8, color: '#666' }}>
+                  复核批注：{answerComments.join('；')}
+                </div>
+              )}
             </div>
           );
         })}

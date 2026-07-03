@@ -35,6 +35,43 @@ const AnswerValueView: React.FC<Props> = ({ value, block }) => {
     return <span style={{ color: '#999' }}>未作答</span>;
   }
 
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object' && ('text' in parsed || 'images' in parsed)) {
+      const images = Array.isArray(parsed.images) ? parsed.images : [];
+      const text = parsed.text || '';
+      if (!text && images.length === 0) {
+        return <span style={{ color: '#999' }}>未作答</span>;
+      }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {text && <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>}
+          {images.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {images.map((src: string, index: number) => (
+                <Image
+                  key={`${src.slice(0, 32)}-${index}`}
+                  src={src}
+                  alt={`主观题答案图片${index + 1}`}
+                  style={{
+                    maxWidth: block ? 360 : 180,
+                    maxHeight: block ? 260 : 120,
+                    borderRadius: 6,
+                    border: '1px solid #e5e7eb',
+                    objectFit: 'contain',
+                    background: '#fff',
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+  } catch {
+    // Non-JSON answers are displayed below.
+  }
+
   if (isImageAnswerValue(value)) {
     return (
       <Image

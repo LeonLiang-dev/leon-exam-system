@@ -14,8 +14,7 @@ const TIPTYPE_OPTIONS = [
   { value: '2', label: '单选题' },
   { value: '3', label: '多选题' },
   { value: '4', label: '判断题' },
-  { value: '5', label: '问答题' },
-  { value: '6', label: '附件题' },
+  { value: '5', label: '主观题' },
 ];
 
 const RandomPage: React.FC = () => {

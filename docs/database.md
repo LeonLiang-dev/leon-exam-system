@@ -14,6 +14,7 @@
 | `sql/init/wts.v1.4.1.sql` | 完整初始化脚本，包含基础权限、管理员账号和示例/历史数据 |
 | `sql/init/wts.empty.sql` | 空库结构脚本，仅包含表结构，不包含 `INSERT` 数据 |
 | `sql/migrations/V2_add_point_column.sql` | v2.0 增量迁移，给题目表补充分值字段 |
+| `sql/migrations/V10_question_type_spec_reset.sql` | v3.0 题型规范迁移，清理旧考试业务数据并补充阅卷字段 |
 
 ## 核心表结构
 

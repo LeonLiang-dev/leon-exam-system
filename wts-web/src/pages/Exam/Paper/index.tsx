@@ -8,7 +8,7 @@ import {
 } from '@/services/exam';
 
 const TIPTYPE_LABELS: Record<string, string> = {
-  '1': '填空', '2': '单选', '3': '多选', '4': '判断', '5': '问答', '6': '附件',
+  '1': '填空', '2': '单选', '3': '多选', '4': '判断', '5': '主观',
 };
 
 const PaperPage: React.FC = () => {

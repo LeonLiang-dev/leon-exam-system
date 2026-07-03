@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CardAnswerGraderTest {
 
@@ -77,11 +78,19 @@ class CardAnswerGraderTest {
                 List.of(cardAnswer("a-1", "some answer")),
                 List.of(subjectAnswer("a-1", "1"))
         ));
-        assertEquals(0, grader.calculateWeight(
-                "6",
-                List.of(cardAnswer("a-1", "file")),
-                List.of(subjectAnswer("a-1", "1"))
-        ));
+    }
+
+    @Test
+    void vacancyFlagsUnmatchedAnsweredBlankForManualReview() {
+        CardAnswerGrader.GradeResult result = grader.grade(
+                "1",
+                List.of(cardAnswer("blank-1", "Jetty")),
+                List.of(subjectAnswer("blank-1", "Tomcat|Apache Tomcat", "1", 100))
+        );
+
+        assertEquals(0, result.weight());
+        assertTrue(result.reviewRequired());
+        assertTrue(result.blankResults().get("blank-1").reviewRequired());
     }
 
     private static ExamCardAnswer cardAnswer(String answerId, String value) {

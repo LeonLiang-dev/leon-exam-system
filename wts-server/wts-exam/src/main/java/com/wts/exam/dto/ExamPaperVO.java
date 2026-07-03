@@ -33,6 +33,7 @@ public class ExamPaperVO implements Serializable {
         private String tiptype;
         private String tipstr;
         private String tipnote;
+        private String pcontent;
         private List<AnswerOptionVO> answers;
     }
 
@@ -42,5 +43,8 @@ public class ExamPaperVO implements Serializable {
         private String answer;
         private Integer sort;
         private String pcontent;
+        private String rightanswer;
+        private String answernote;
+        private Integer pointweight;
     }
 }

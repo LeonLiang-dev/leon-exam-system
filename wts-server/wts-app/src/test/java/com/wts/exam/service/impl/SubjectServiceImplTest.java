@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -78,8 +79,9 @@ class SubjectServiceImplTest {
         assertEquals("0", version.getAnswered());
 
         ArgumentCaptor<ExamSubjectAnswer> answerCaptor = ArgumentCaptor.forClass(ExamSubjectAnswer.class);
-        verify(answerMapper).insert(answerCaptor.capture());
-        ExamSubjectAnswer answer = answerCaptor.getValue();
+        verify(answerMapper, times(2)).insert(answerCaptor.capture());
+        List<ExamSubjectAnswer> insertedAnswers = answerCaptor.getAllValues();
+        ExamSubjectAnswer answer = insertedAnswers.get(0);
         assertEquals(version.getId(), answer.getVersionid());
         assertEquals("A", answer.getAnswer());
         assertEquals("1", answer.getRightanswer());
@@ -90,6 +92,8 @@ class SubjectServiceImplTest {
         assertEquals("答案说明", answer.getAnswernote());
         assertEquals(100, answer.getPointweight());
         assertEquals(answer.getId(), answer.getUuid());
+        assertEquals("B", insertedAnswers.get(1).getAnswer());
+        assertEquals("0", insertedAnswers.get(1).getRightanswer());
     }
 
     @Test
@@ -129,7 +133,11 @@ class SubjectServiceImplTest {
         SubjectDTO dto = new SubjectDTO();
         dto.setTiptype("4");
         dto.setTipstr("新版题干");
-        dto.setAnswers(List.of(answerDto("正确", "1", 1)));
+        dto.setPoint(3);
+        dto.setAnswers(List.of(
+                answerDto("正确", "1", 1),
+                answerDto("错误", "0", 2)
+        ));
 
         ExamSubject updated = service.update("subject-1", dto, "teacher-1", "Teacher One");
 
@@ -148,8 +156,8 @@ class SubjectServiceImplTest {
         assertEquals("4", versionCaptor.getValue().getTiptype());
 
         ArgumentCaptor<ExamSubjectAnswer> answerCaptor = ArgumentCaptor.forClass(ExamSubjectAnswer.class);
-        verify(answerMapper).insert(answerCaptor.capture());
-        assertEquals(subject.getVersionid(), answerCaptor.getValue().getVersionid());
+        verify(answerMapper, times(2)).insert(answerCaptor.capture());
+        assertEquals(subject.getVersionid(), answerCaptor.getAllValues().get(0).getVersionid());
     }
 
     @Test
@@ -210,7 +218,11 @@ class SubjectServiceImplTest {
         dto.setTipstr("题干");
         dto.setTipnote("解析提示");
         dto.setPcontent("正文");
-        dto.setAnswers(List.of(answerDto("A", "1", 1)));
+        dto.setPoint(1);
+        dto.setAnswers(List.of(
+                answerDto("A", "1", 1),
+                answerDto("B", "0", 2)
+        ));
         return dto;
     }
 

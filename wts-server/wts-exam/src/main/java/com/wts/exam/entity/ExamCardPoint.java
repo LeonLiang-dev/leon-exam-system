@@ -18,4 +18,7 @@ public class ExamCardPoint implements Serializable {
     private Integer point;
     private Integer mpoint;
     private String complete;
+    private String reviewRequired;
+    private String reviewReason;
+    private String reviewComment;
 }

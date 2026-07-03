@@ -55,7 +55,7 @@ public final class LeonExamLauncher {
     private static final int MIN_PORT = 1024;
     private static final int MAX_PORT = 65535;
     private static final Duration START_TIMEOUT = Duration.ofSeconds(90);
-    private static final String APP_JAR_NAME = "wts-app-2.0.0-SNAPSHOT.jar";
+    private static final String APP_JAR_NAME = "wts-app-3.0.0-SNAPSHOT.jar";
 
     private final JFrame frame = new JFrame("Leon在线考试系统");
     private final JLabel statusLabel = new JLabel("准备启动");

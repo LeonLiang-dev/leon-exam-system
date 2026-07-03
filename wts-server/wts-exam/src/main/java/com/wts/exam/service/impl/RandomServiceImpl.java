@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.wts.common.exception.BizException;
 import com.wts.exam.dto.RandomItemDTO;
 import com.wts.exam.entity.*;
+import com.wts.exam.enums.QuestionTypeRules;
 import com.wts.exam.mapper.*;
 import com.wts.exam.service.RandomService;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +89,10 @@ public class RandomServiceImpl implements RandomService {
     @Override
     @Transactional
     public ExamRandomStep addStep(String itemId, RandomItemDTO.RandomStepDTO dto) {
+        String tiptype = valueOrDefault(dto.getTiptype(), QuestionTypeRules.SINGLE_CHOICE);
+        if (!QuestionTypeRules.isSupportedType(tiptype)) {
+            throw BizException.fail("不支持的题型");
+        }
         ExamRandomStep step = new ExamRandomStep();
         step.setId(UUID.randomUUID().toString().replace("-", ""));
         step.setItemid(itemId);
@@ -95,7 +100,7 @@ public class RandomServiceImpl implements RandomService {
         step.setSort(dto.getSort() != null ? dto.getSort() : 1);
         step.setSubnum(dto.getSubnum() != null ? dto.getSubnum() : 0);
         step.setSubpoint(dto.getSubpoint() != null ? dto.getSubpoint() : 0);
-        step.setTiptype(valueOrDefault(dto.getTiptype(), "2"));
+        step.setTiptype(tiptype);
         step.setTypeid(dto.getTypeid());
         step.setKnowid(dto.getKnowid());
         step.setPcontent("");
@@ -112,6 +117,9 @@ public class RandomServiceImpl implements RandomService {
         step.setSort(dto.getSort());
         step.setSubnum(dto.getSubnum());
         step.setSubpoint(dto.getSubpoint());
+        if (!QuestionTypeRules.isSupportedType(dto.getTiptype())) {
+            throw BizException.fail("不支持的题型");
+        }
         step.setTiptype(dto.getTiptype());
         step.setTypeid(dto.getTypeid());
         step.setKnowid(dto.getKnowid());

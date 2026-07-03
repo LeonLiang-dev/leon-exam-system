@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import {
-  Button, message, Modal, Form, Input, Select, Popconfirm, Space, InputNumber, Card, TreeSelect, Upload,
+  Button, message, Modal, Form, Input, Select, Popconfirm, Space, InputNumber, Card, TreeSelect, Upload, Image,
 } from 'antd';
 import {
   DeleteOutlined,
@@ -28,11 +28,65 @@ const TIPTYPE_OPTIONS = [
   { value: '2', label: '单选题' },
   { value: '3', label: '多选题' },
   { value: '4', label: '判断题' },
-  { value: '5', label: '问答题' },
-  { value: '6', label: '附件题' },
+  { value: '5', label: '主观题' },
 ];
 
+const FILL_BLANK_TIPTYPE = '1';
 const SINGLE_CHOICE_TIPTYPE = '2';
+const MULTIPLE_CHOICE_TIPTYPE = '3';
+const TRUE_FALSE_TIPTYPE = '4';
+const SUBJECTIVE_TIPTYPE = '5';
+const CHOICE_TIPTYPES = new Set([SINGLE_CHOICE_TIPTYPE, MULTIPLE_CHOICE_TIPTYPE]);
+
+const compressImageToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+    reject(new Error('仅支持 JPG、JPEG、PNG、WEBP 图片'));
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error('读取图片失败'));
+  reader.onload = () => {
+    const img = new window.Image();
+    img.onerror = () => reject(new Error('图片解析失败'));
+    img.onload = () => {
+      const scale = Math.min(1, 1400 / img.width, 1400 / img.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('浏览器不支持图片处理'));
+        return;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.src = String(reader.result || '');
+  };
+  reader.readAsDataURL(file);
+});
+
+const defaultAnswersForType = (tiptype: string) => {
+  if (tiptype === TRUE_FALSE_TIPTYPE) {
+    return [
+      { answer: '正确', rightanswer: '1' },
+      { answer: '错误', rightanswer: '0' },
+    ];
+  }
+  if (tiptype === FILL_BLANK_TIPTYPE) {
+    return [{ answer: '', rightanswer: '1', pointweight: 100 }];
+  }
+  if (CHOICE_TIPTYPES.has(tiptype)) {
+    return [
+      { answer: '', rightanswer: '1' },
+      { answer: '', rightanswer: '0' },
+    ];
+  }
+  return [];
+};
+
 
 const countCorrectAnswers = (answers: any[] = []) =>
   answers.filter((answer) => answer?.rightanswer === '1').length;
@@ -64,6 +118,7 @@ const SubjectPage: React.FC = () => {
   const [importTypeid, setImportTypeid] = useState<string>('');
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const questionImage = Form.useWatch('pcontent', form);
 
   useEffect(() => {
     getSubjectTypeTree().then((res: any) => {
@@ -136,18 +191,25 @@ const SubjectPage: React.FC = () => {
                   rightanswer: a.rightanswer || '0',
                   pointweight: a.pointweight,
                   answernote: a.answernote,
+                  pcontent: a.pcontent,
+                  groupno: a.groupno,
                 }));
+                const judgeCorrect = answerValues.find((a: any) => a.rightanswer === '1')?.answer === '错误'
+                  ? 'false'
+                  : 'true';
                 setEditingSubject(record);
                 setSelectedTiptype(tiptype);
                 form.setFieldsValue({
                   typeid: subject.typeid,
                   tipstr: version?.tipstr || subject.introduction,
                   tipnote: version?.tipnote,
+                  pcontent: version?.pcontent,
                   level: subject.level,
                   point: subject.point || 1,
+                  judgeAnswer: judgeCorrect,
                   answers: tiptype === SINGLE_CHOICE_TIPTYPE
                     ? normalizeSingleChoiceAnswers(answerValues)
-                    : answerValues,
+                    : (answerValues.length > 0 ? answerValues : defaultAnswersForType(tiptype)),
                 });
                 setModalOpen(true);
               } catch {
@@ -174,9 +236,26 @@ const SubjectPage: React.FC = () => {
 
   const handleTiptypeChange = (value: string) => {
     setSelectedTiptype(value);
-    if (value === SINGLE_CHOICE_TIPTYPE) {
+    if (value === TRUE_FALSE_TIPTYPE) {
+      form.setFieldsValue({ answers: defaultAnswersForType(value), judgeAnswer: 'true' });
+      return;
+    }
+    if (value === SUBJECTIVE_TIPTYPE) {
+      form.setFieldsValue({ answers: [] });
+      return;
+    }
+    if (value === FILL_BLANK_TIPTYPE) {
+      form.setFieldsValue({ answers: defaultAnswersForType(value) });
+      return;
+    }
+    if (CHOICE_TIPTYPES.has(value)) {
       const answers = form.getFieldValue('answers') || [];
-      form.setFieldsValue({ answers: normalizeSingleChoiceAnswers(answers) });
+      const nextAnswers = answers.length >= 2 ? answers : defaultAnswersForType(value);
+      form.setFieldsValue({
+        answers: value === SINGLE_CHOICE_TIPTYPE
+          ? normalizeSingleChoiceAnswers(nextAnswers)
+          : nextAnswers,
+      });
     }
   };
 
@@ -189,11 +268,43 @@ const SubjectPage: React.FC = () => {
 
   const handleOk = async () => {
     const values = await form.validateFields();
-    const answers = values.answers || [];
-    if (selectedTiptype === SINGLE_CHOICE_TIPTYPE && countCorrectAnswers(answers) !== 1) {
-      message.error('单选题必须且只能设置一个正确答案');
-      return;
+    let answers: any[] = [];
+    if (CHOICE_TIPTYPES.has(selectedTiptype)) {
+      answers = values.answers || [];
+      if (answers.length < 2 || answers.length > 10) {
+        message.error('选择题必须设置2到10个选项');
+        return;
+      }
+      if (answers.some((answer) => !answer?.answer?.trim())) {
+        message.error('每个选项内容不能为空');
+        return;
+      }
+      const correctCount = countCorrectAnswers(answers);
+      if (selectedTiptype === SINGLE_CHOICE_TIPTYPE && correctCount !== 1) {
+        message.error('单选题必须且只能设置一个正确答案');
+        return;
+      }
+      if (selectedTiptype === MULTIPLE_CHOICE_TIPTYPE && correctCount < 2) {
+        message.error('多选题必须设置至少两个正确答案');
+        return;
+      }
+      if (selectedTiptype === MULTIPLE_CHOICE_TIPTYPE && correctCount === answers.length) {
+        message.error('多选题至少需要一个错误选项');
+        return;
+      }
+    } else if (selectedTiptype === TRUE_FALSE_TIPTYPE) {
+      answers = [
+        { answer: '正确', rightanswer: values.judgeAnswer === 'true' ? '1' : '0' },
+        { answer: '错误', rightanswer: values.judgeAnswer === 'false' ? '1' : '0' },
+      ];
+    } else if (selectedTiptype === FILL_BLANK_TIPTYPE) {
+      answers = values.answers || [];
+      if (answers.length === 0 || answers.some((answer) => !answer?.answer?.trim())) {
+        message.error('填空题每个空都必须设置标准答案');
+        return;
+      }
     }
+
     const dto = {
       typeid: values.typeid,
       tiptype: selectedTiptype,
@@ -202,12 +313,14 @@ const SubjectPage: React.FC = () => {
       pcontent: values.pcontent,
       level: values.level,
       point: values.point,
-      answers: (values.answers || []).map((a: any, idx: number) => ({
-        answer: a.answer,
+      answers: answers.map((a: any, idx: number) => ({
+        answer: a.answer || '',
         answernote: a.answernote,
-        rightanswer: a.rightanswer || '0',
+        rightanswer: selectedTiptype === FILL_BLANK_TIPTYPE ? '1' : (a.rightanswer || '0'),
         sort: idx + 1,
         pointweight: a.pointweight,
+        groupno: selectedTiptype === FILL_BLANK_TIPTYPE ? idx + 1 : a.groupno,
+        pcontent: a.pcontent,
       })),
     };
     try {
@@ -253,7 +366,7 @@ const SubjectPage: React.FC = () => {
     });
   };
 
-  const showAnswers = ['2', '3', '4', '1'].includes(selectedTiptype);
+  const showAnswers = CHOICE_TIPTYPES.has(selectedTiptype) || selectedTiptype === FILL_BLANK_TIPTYPE;
 
   return (
     <>
@@ -271,6 +384,7 @@ const SubjectPage: React.FC = () => {
               setEditingSubject(null);
               form.resetFields();
               setSelectedTiptype(SINGLE_CHOICE_TIPTYPE);
+              form.setFieldsValue({ point: 1, level: 1, answers: defaultAnswersForType(SINGLE_CHOICE_TIPTYPE) });
               setModalOpen(true);
             }}
           >
@@ -374,7 +488,47 @@ const SubjectPage: React.FC = () => {
           >
             <Input.TextArea rows={3} placeholder="请输入题目内容" />
           </Form.Item>
-          <Form.Item name="tipnote" label="题目说明">
+          <Form.Item name="pcontent" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item label="题干配图">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {questionImage && (
+                <Image
+                  src={questionImage}
+                  alt="题干配图"
+                  style={{ maxWidth: 240, maxHeight: 160, objectFit: 'contain', borderRadius: 4 }}
+                />
+              )}
+              <Space>
+                <Upload
+                  accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                  showUploadList={false}
+                  beforeUpload={async (file) => {
+                    try {
+                      const dataUrl = await compressImageToDataUrl(file as File);
+                      form.setFieldValue('pcontent', dataUrl);
+                      message.success('题干配图已添加');
+                    } catch (error: any) {
+                      message.error(error?.message || '图片处理失败');
+                    }
+                    return false;
+                  }}
+                >
+                  <Button icon={<UploadOutlined />}>上传图片</Button>
+                </Upload>
+                {questionImage && (
+                  <Button danger onClick={() => form.setFieldValue('pcontent', undefined)}>
+                    删除图片
+                  </Button>
+                )}
+              </Space>
+            </Space>
+          </Form.Item>
+          <Form.Item
+            name="tipnote"
+            label={selectedTiptype === SUBJECTIVE_TIPTYPE ? '评分标准 / 示例答案' : '答案解析'}
+          >
             <Input.TextArea rows={2} placeholder="可选" />
           </Form.Item>
           <Form.Item name="level" label="难度" initialValue={1}>
@@ -388,8 +542,19 @@ const SubjectPage: React.FC = () => {
             <InputNumber min={1} max={100} style={{ width: '100%' }} />
           </Form.Item>
 
+          {selectedTiptype === TRUE_FALSE_TIPTYPE && (
+            <Card title="判断题答案" size="small" style={{ marginBottom: 16 }}>
+              <Form.Item name="judgeAnswer" initialValue="true" rules={[{ required: true, message: '请选择正确答案' }]}>
+                <Select>
+                  <Select.Option value="true">正确</Select.Option>
+                  <Select.Option value="false">错误</Select.Option>
+                </Select>
+              </Form.Item>
+            </Card>
+          )}
+
           {showAnswers && (
-            <Card title="答案选项" size="small" style={{ marginBottom: 16 }}>
+            <Card title={selectedTiptype === FILL_BLANK_TIPTYPE ? '填空标准答案' : '答案选项'} size="small" style={{ marginBottom: 16 }}>
               <Form.List name="answers">
                 {(fields, { add, remove }) => (
                   <>
@@ -400,30 +565,51 @@ const SubjectPage: React.FC = () => {
                           name={[name, 'answer']}
                           rules={[{ required: true, message: '选项内容' }]}
                         >
-                          <Input placeholder="选项内容" style={{ width: 280 }} />
+                          <Input
+                            placeholder={selectedTiptype === FILL_BLANK_TIPTYPE ? '标准答案，多个答案用 | 分隔' : '选项内容'}
+                            style={{ width: selectedTiptype === FILL_BLANK_TIPTYPE ? 360 : 280 }}
+                          />
                         </Form.Item>
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'rightanswer']}
-                          initialValue="0"
-                        >
-                          <Select
-                            style={{ width: 100 }}
-                            onChange={(value) => {
-                              if (selectedTiptype === SINGLE_CHOICE_TIPTYPE && value === '1') {
-                                markSingleChoiceAnswer(name);
-                              }
-                            }}
+                        {selectedTiptype === FILL_BLANK_TIPTYPE ? (
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'pointweight']}
+                            initialValue={100}
                           >
-                            <Select.Option value="0">错误</Select.Option>
-                            <Select.Option value="1">正确</Select.Option>
-                          </Select>
-                        </Form.Item>
+                            <InputNumber min={1} max={1000} placeholder="权重" style={{ width: 90 }} />
+                          </Form.Item>
+                        ) : (
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'rightanswer']}
+                            initialValue="0"
+                          >
+                            <Select
+                              style={{ width: 100 }}
+                              onChange={(value) => {
+                                if (selectedTiptype === SINGLE_CHOICE_TIPTYPE && value === '1') {
+                                  markSingleChoiceAnswer(name);
+                                }
+                              }}
+                            >
+                              <Select.Option value="0">错误</Select.Option>
+                              <Select.Option value="1">正确</Select.Option>
+                            </Select>
+                          </Form.Item>
+                        )}
                         <MinusCircleOutlined onClick={() => remove(name)} />
                       </Space>
                     ))}
-                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                      添加选项
+                    <Button
+                      type="dashed"
+                      onClick={() => add(selectedTiptype === FILL_BLANK_TIPTYPE
+                        ? { answer: '', rightanswer: '1', pointweight: 100 }
+                        : { answer: '', rightanswer: '0' })}
+                      block
+                      icon={<PlusOutlined />}
+                      disabled={selectedTiptype !== FILL_BLANK_TIPTYPE && fields.length >= 10}
+                    >
+                      {selectedTiptype === FILL_BLANK_TIPTYPE ? '添加空' : '添加选项'}
                     </Button>
                   </>
                 )}
@@ -454,7 +640,7 @@ const SubjectPage: React.FC = () => {
         <div style={{ marginBottom: 16 }}>
           <p style={{ marginBottom: 8 }}>上传Excel文件（.xlsx）：</p>
           <p style={{ color: '#999', fontSize: 12 }}>
-            Excel模板包含5个Sheet：选择题、判断题、填空题、问答题、附件题。
+            Excel模板包含4个Sheet：选择题、判断题、填空题、主观题。
             每行格式：TYPE | TEXT | RIGHT1~6 | RIGHT | ...
           </p>
         </div>

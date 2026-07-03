@@ -32,8 +32,6 @@ public class SubjectServiceImpl implements SubjectService {
     private final ExamSubjectVersionMapper versionMapper;
     private final ExamSubjectAnswerMapper answerMapper;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-    private static final String SINGLE_CHOICE_TIPTYPE = "2";
-    private static final String RIGHT_ANSWER = "1";
 
     @Override
     public PageResult<ExamSubject> list(SubjectQueryDTO query) {
@@ -65,7 +63,7 @@ public class SubjectServiceImpl implements SubjectService {
     @Override
     @Transactional
     public ExamSubject create(SubjectDTO dto, String operatorId, String operatorName) {
-        validateAnswerRules(dto);
+        List<AnswerDTO> normalizedAnswers = SubjectRuleValidator.validateAndNormalize(dto);
 
         String now = LocalDateTime.now().format(FMT);
         String subjectId = UUID.randomUUID().toString().replace("-", "");
@@ -79,7 +77,7 @@ public class SubjectServiceImpl implements SubjectService {
         subject.setPstate("1");
         subject.setIntroduction(dto.getTipstr());
         subject.setLevel(dto.getLevel() != null ? dto.getLevel() : 1);
-        subject.setPoint(dto.getPoint() != null ? dto.getPoint() : 1);
+        subject.setPoint(dto.getPoint());
         subject.setUuid(subjectId);
         subject.setPraisenum(0);
         subject.setCommentnum(0);
@@ -104,8 +102,8 @@ public class SubjectServiceImpl implements SubjectService {
         versionMapper.insert(version);
 
         // Create answers
-        if (dto.getAnswers() != null) {
-            for (AnswerDTO ansDto : dto.getAnswers()) {
+        if (normalizedAnswers != null) {
+            for (AnswerDTO ansDto : normalizedAnswers) {
                 ExamSubjectAnswer answer = new ExamSubjectAnswer();
                 answer.setId(UUID.randomUUID().toString().replace("-", ""));
                 answer.setVersionid(versionId);
@@ -133,7 +131,7 @@ public class SubjectServiceImpl implements SubjectService {
     public ExamSubject update(String id, SubjectDTO dto, String operatorId, String operatorName) {
         ExamSubject subject = subjectMapper.selectById(id);
         if (subject == null) throw BizException.notFound("题目");
-        validateAnswerRules(dto);
+        List<AnswerDTO> normalizedAnswers = SubjectRuleValidator.validateAndNormalize(dto);
 
         String now = LocalDateTime.now().format(FMT);
         String newVersionId = UUID.randomUUID().toString().replace("-", "");
@@ -154,8 +152,8 @@ public class SubjectServiceImpl implements SubjectService {
         versionMapper.insert(version);
 
         // Create new answers for new version
-        if (dto.getAnswers() != null) {
-            for (AnswerDTO ansDto : dto.getAnswers()) {
+        if (normalizedAnswers != null) {
+            for (AnswerDTO ansDto : normalizedAnswers) {
                 ExamSubjectAnswer answer = new ExamSubjectAnswer();
                 answer.setId(UUID.randomUUID().toString().replace("-", ""));
                 answer.setVersionid(newVersionId);
@@ -180,7 +178,7 @@ public class SubjectServiceImpl implements SubjectService {
         if (dto.getTypeid() != null) subject.setTypeid(dto.getTypeid());
         if (dto.getTipstr() != null) subject.setIntroduction(dto.getTipstr());
         if (dto.getLevel() != null) subject.setLevel(dto.getLevel());
-        if (dto.getPoint() != null) subject.setPoint(dto.getPoint());
+        subject.setPoint(dto.getPoint());
         subjectMapper.updateById(subject);
 
         return subject;
@@ -227,19 +225,5 @@ public class SubjectServiceImpl implements SubjectService {
 
     private String valueOrDefault(String value, String defaultValue) {
         return value != null && !value.isBlank() ? value : defaultValue;
-    }
-
-    private void validateAnswerRules(SubjectDTO dto) {
-        if (dto == null || !SINGLE_CHOICE_TIPTYPE.equals(dto.getTiptype())) {
-            return;
-        }
-        long correctCount = dto.getAnswers() == null
-                ? 0
-                : dto.getAnswers().stream()
-                .filter(answer -> answer != null && RIGHT_ANSWER.equals(valueOrDefault(answer.getRightanswer(), "0")))
-                .count();
-        if (correctCount != 1) {
-            throw BizException.fail("单选题必须且只能设置一个正确答案");
-        }
     }
 }

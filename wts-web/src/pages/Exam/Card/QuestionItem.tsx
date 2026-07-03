@@ -1,15 +1,13 @@
 import React from 'react';
-import { Radio, Checkbox, Input, Tag, Space, Button, Image as AntImage, message } from 'antd';
-import { DeleteOutlined, PictureOutlined } from '@ant-design/icons';
-import { isImageAnswerValue } from './AnswerValueView';
+import { Radio, Checkbox, Input, Tag, Space, Button, Image as AntImage, message, Upload } from 'antd';
+import { DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 
 const TIPTYPE_LABELS: Record<string, { label: string; color: string }> = {
   '1': { label: '填空题', color: 'blue' },
   '2': { label: '单选题', color: 'green' },
   '3': { label: '多选题', color: 'orange' },
   '4': { label: '判断题', color: 'purple' },
-  '5': { label: '问答题', color: 'cyan' },
-  '6': { label: '附件题', color: 'magenta' },
+  '5': { label: '主观题', color: 'cyan' },
 };
 
 interface AnswerOption {
@@ -28,6 +26,7 @@ interface Subject {
   tiptype: string;
   tipstr?: string;
   tipnote?: string;
+  pcontent?: string;
   answers: AnswerOption[];
 }
 
@@ -43,6 +42,10 @@ const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024;
 const MAX_IMAGE_SIDE = 1400;
 
 const compressImageToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+    reject(new Error('仅支持 JPG、JPEG、PNG、WEBP 图片'));
+    return;
+  }
   const reader = new FileReader();
   reader.onerror = () => reject(new Error('读取图片失败'));
   reader.onload = () => {
@@ -88,21 +91,44 @@ const getPastedImageFile = (event: React.ClipboardEvent): File | null => {
 const QuestionItem: React.FC<Props> = ({ index, subject, value, onChange, mobile }) => {
   const typeInfo = TIPTYPE_LABELS[subject.tiptype] || { label: '未知', color: 'default' };
 
-  const handleFillPaste = async (event: React.ClipboardEvent, answerId: string) => {
-    const file = getPastedImageFile(event);
-    if (!file) return;
-    event.preventDefault();
-    const hide = message.loading('正在处理粘贴的图片...', 0);
+  const getSubjectiveValue = () => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return { text: value.text || '', images: Array.isArray(value.images) ? value.images : [] };
+    }
+    if (typeof value === 'string') {
+      return { text: value, images: [] };
+    }
+    return { text: '', images: [] };
+  };
+
+  const updateSubjectiveValue = (patch: Partial<{ text: string; images: string[] }>) => {
+    const current = getSubjectiveValue();
+    onChange?.({ ...current, ...patch });
+  };
+
+  const appendSubjectiveImage = async (file: File) => {
+    const current = getSubjectiveValue();
+    if (current.images.length >= 5) {
+      message.warning('最多上传5张图片');
+      return;
+    }
+    const hide = message.loading('正在处理图片...', 0);
     try {
       const dataUrl = await compressImageToDataUrl(file);
-      const newValue = { ...(value || {}), [answerId]: dataUrl };
-      onChange?.(newValue);
-      message.success('图片已粘贴');
+      updateSubjectiveValue({ images: [...current.images, dataUrl] });
+      message.success('图片已添加');
     } catch (error: any) {
-      message.error(error?.message || '图片粘贴失败');
+      message.error(error?.message || '图片处理失败');
     } finally {
       hide();
     }
+  };
+
+  const handleSubjectivePaste = async (event: React.ClipboardEvent) => {
+    const file = getPastedImageFile(event);
+    if (!file) return;
+    event.preventDefault();
+    await appendSubjectiveImage(file);
   };
 
   const renderQuestionBody = () => {
@@ -160,62 +186,19 @@ const QuestionItem: React.FC<Props> = ({ index, subject, value, onChange, mobile
           <Space direction="vertical" style={{ width: '100%' }}>
             {subject.answers.map((a) => {
               const currentValue = value?.[a.id] || '';
-              const isImage = isImageAnswerValue(currentValue);
               return (
                 <div key={a.id} style={{ marginBottom: 10, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ flexShrink: 0, lineHeight: '32px' }}>({a.sort})</span>
-                  <div style={{ flex: 1 }}>
-                    {isImage ? (
-                      <div
-                        tabIndex={0}
-                        onPaste={(event) => handleFillPaste(event, a.id)}
-                        style={{
-                          padding: 10,
-                          border: '1px solid #d9d9d9',
-                          borderRadius: 6,
-                          background: '#fff',
-                          outline: 'none',
-                        }}
-                      >
-                        <AntImage
-                          src={currentValue}
-                          alt="填空答案图片"
-                          style={{
-                            maxWidth: mobile ? 220 : 320,
-                            maxHeight: 220,
-                            borderRadius: 4,
-                            objectFit: 'contain',
-                          }}
-                        />
-                        <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span style={{ color: '#64748b', fontSize: 12 }}>可继续粘贴图片替换当前答案</span>
-                          <Button
-                            size="small"
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={() => {
-                              const newValue = { ...(value || {}), [a.id]: '' };
-                              onChange?.(newValue);
-                            }}
-                          >
-                            删除图片
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Input
-                        style={{ flex: 1 }}
-                        placeholder="请输入答案，或直接粘贴图片"
-                        value={currentValue}
-                        prefix={<PictureOutlined style={{ color: '#94a3b8' }} />}
-                        onPaste={(event) => handleFillPaste(event, a.id)}
-                        onChange={(e) => {
-                          const newValue = { ...(value || {}), [a.id]: e.target.value };
-                          onChange?.(newValue);
-                        }}
-                      />
-                    )}
-                  </div>
+                  <Input
+                    style={{ flex: 1 }}
+                    maxLength={100}
+                    placeholder="请输入文本答案"
+                    value={currentValue}
+                    onChange={(e) => {
+                      const newValue = { ...(value || {}), [a.id]: e.target.value };
+                      onChange?.(newValue);
+                    }}
+                  />
                 </div>
               );
             })}
@@ -223,21 +206,63 @@ const QuestionItem: React.FC<Props> = ({ index, subject, value, onChange, mobile
         );
 
       case '5': // Essay
-        return (
-          <Input.TextArea
-            rows={6}
-            placeholder="请输入你的答案"
-            value={value || ''}
-            onChange={(e) => onChange?.(e.target.value)}
-          />
-        );
-
-      case '6': // File upload
-        return (
-          <div style={{ padding: 16, background: '#fafafa', borderRadius: 4 }}>
-            <p>附件题暂不支持在线作答，请联系管理员。</p>
-          </div>
-        );
+        {
+          const current = getSubjectiveValue();
+          return (
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Input.TextArea
+                rows={6}
+                maxLength={10000}
+                showCount
+                placeholder="请输入文字答案"
+                value={current.text}
+                onPaste={handleSubjectivePaste}
+                onChange={(e) => updateSubjectiveValue({ text: e.target.value })}
+              />
+              <Upload
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                showUploadList={false}
+                beforeUpload={async (file) => {
+                  await appendSubjectiveImage(file as File);
+                  return false;
+                }}
+              >
+                <Button icon={<UploadOutlined />} disabled={current.images.length >= 5}>
+                  添加图片
+                </Button>
+              </Upload>
+              {current.images.length > 0 && (
+                <Space wrap align="start">
+                  {current.images.map((src: string, imgIndex: number) => (
+                    <div key={`${src.slice(0, 32)}-${imgIndex}`} style={{ position: 'relative' }}>
+                      <AntImage
+                        src={src}
+                        alt={`主观题答案图片${imgIndex + 1}`}
+                        style={{
+                          maxWidth: mobile ? 120 : 160,
+                          maxHeight: 120,
+                          borderRadius: 4,
+                          objectFit: 'contain',
+                        }}
+                      />
+                      <Button
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        style={{ marginTop: 6, display: 'block' }}
+                        onClick={() => updateSubjectiveValue({
+                          images: current.images.filter((_: string, idx: number) => idx !== imgIndex),
+                        })}
+                      >
+                        删除
+                      </Button>
+                    </div>
+                  ))}
+                </Space>
+              )}
+            </Space>
+          );
+        }
 
       default:
         return <div>不支持的题型</div>;
@@ -259,6 +284,20 @@ const QuestionItem: React.FC<Props> = ({ index, subject, value, onChange, mobile
       </div>
       {subject.tipnote && (
         <div style={{ marginBottom: 12, color: '#666', fontSize: 13 }}>{subject.tipnote}</div>
+      )}
+      {subject.pcontent && (
+        <div style={{ marginBottom: 12 }}>
+          <AntImage
+            src={subject.pcontent}
+            alt="题干配图"
+            style={{
+              maxWidth: mobile ? 260 : 420,
+              maxHeight: 260,
+              borderRadius: 4,
+              objectFit: 'contain',
+            }}
+          />
+        </div>
       )}
       {renderQuestionBody()}
     </div>

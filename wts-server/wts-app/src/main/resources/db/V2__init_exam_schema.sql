@@ -395,6 +395,11 @@ CREATE TABLE IF NOT EXISTS wts_card_answer (
     CTIME       varchar(16),
     PCONTENT    varchar(256),
     PSTATE      varchar(2),
+    POINT       int DEFAULT 0,
+    MPOINT      int DEFAULT 0,
+    REVIEW_REQUIRED varchar(1) DEFAULT '0',
+    REVIEW_REASON   varchar(64) DEFAULT '',
+    REVIEW_COMMENT  varchar(512) DEFAULT '',
     PRIMARY KEY (ID),
     KEY IDX_CARD_ANSWER_CARDID_VERSIONID_ANSWERID (CARDID, VERSIONID, ANSWERID),
     KEY IDX_CARD_ANSWER_CARDID_VERSIONID (CARDID, VERSIONID)
@@ -407,6 +412,9 @@ CREATE TABLE IF NOT EXISTS wts_card_point (
     POINT       int,
     MPOINT      int,
     COMPLETE    varchar(1),
+    REVIEW_REQUIRED varchar(1) DEFAULT '0',
+    REVIEW_REASON   varchar(64) DEFAULT '',
+    REVIEW_COMMENT  varchar(512) DEFAULT '',
     PRIMARY KEY (ID),
     KEY IDX_CARD_POINT_CARDID (CARDID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -18,7 +18,7 @@ public class HealthController {
         return R.ok(Map.of(
                 "status", "UP",
                 "service", "WTS Server",
-                "version", "2.0.0",
+                "version", "3.0.0",
                 "time", LocalDateTime.now().toString()
         ));
     }
