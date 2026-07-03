@@ -79,6 +79,12 @@ dist\jpackage\
 
 如果 `preflight` 已通过但 `package` 失败，优先查看命令行最后一个 `ERROR:` 提示；启动器运行阶段的日志会显示在启动器窗口中。
 
+## 从 2.x 安装到 3.0.0
+
+`3.0.0` 是重置版本，安装包使用新的 3.x 升级标识，不再依赖 2.x 安装包的 MSI 源文件。这样可以避免 Windows Installer 在升级时提示寻找 `LeonExam-2.0.17.msi`。
+
+如果机器上已经出现“找不到 `LeonExam-2.0.17.msi`”的窗口，取消旧安装器流程后，使用重新构建的 `3.0.0` 安装包安装。旧的 2.x 卸载项可能仍留在 Windows“应用和功能”列表中；如需清理，可以使用 Windows 官方安装/卸载疑难解答工具移除旧记录。
+
 ## 运行数据目录
 
 安装目录只放程序文件。运行数据放在：
@@ -92,7 +98,26 @@ C:\ProgramData\LeonExam\
   uploads\
 ```
 
-升级程序时不要删除 `C:\ProgramData\LeonExam`，否则会丢失考试数据和上传文件。
+安装器只覆盖程序文件，不直接删除 `C:\ProgramData\LeonExam`。启动器检测到已有数据库、上传文件或外部配置时，会询问是否覆盖旧数据。
+
+选择覆盖后，启动器会先备份旧数据，再重新初始化干净数据库和文件目录。备份位置：
+
+```text
+C:\ProgramData\LeonExam\backup\yyyyMMdd-HHmmss\
+```
+
+需要无人值守覆盖时，可在启动前设置环境变量：
+
+```powershell
+set LEON_EXAM_OVERWRITE_DATA=1
+LeonExam.exe
+```
+
+也可以使用启动参数：
+
+```powershell
+LeonExam.exe --overwrite-data
+```
 
 ## 端口设置
 

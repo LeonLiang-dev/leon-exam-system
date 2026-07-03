@@ -218,7 +218,7 @@ http://localhost:8000
 
 - Windows 教师机安装包默认使用 `wts.empty.sql` + `wts.clean-seed.sql` 初始化，首次安装只保留内置管理员，不包含题目、试卷、答题室、学生和答卷演示数据。
 - `wts.v1.4.1.sql` 仅作为原始 WTS 数据参考或手工演示库使用。
-- 如果某台机器已经初始化过演示数据，升级安装包不会自动清库；从 `3.0.0` 起可删除 `C:\ProgramData\LeonExam\mysql` 后重新初始化，或手工执行 `sql/maintenance/reset_to_clean_admin.sql`。
+- 如果某台机器已经初始化过旧数据，从 `3.0.0` 起启动器会在检测到旧数据库、上传文件或外部配置时询问是否覆盖；选择覆盖后会先备份到 `C:\ProgramData\LeonExam\backup\yyyyMMdd-HHmmss\`，再重新初始化干净数据库。
 
 ## 默认账号
 
@@ -466,7 +466,11 @@ cd ..
 Remove-Item "C:\ProgramData\LeonExam\mysql" -Recurse -Force
 ```
 
-### 5. 普通 JAR 和 Windows 安装包有什么区别
+### 5. 安装时提示找不到 `LeonExam-2.0.17.msi`
+
+这是旧 2.x 安装包的 Windows Installer 源文件缺失。重新构建并使用 `3.0.0` 安装包；`3.0.0` 使用新的 3.x 升级标识，不会再依赖旧的 `LeonExam-2.0.17.msi`。旧的 2.x 卸载项如需清理，可使用 Windows 官方安装/卸载疑难解答工具移除。
+
+### 6. 普通 JAR 和 Windows 安装包有什么区别
 
 普通 JAR：
 

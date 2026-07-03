@@ -28,7 +28,9 @@ set "PACKAGE_MODE=0"
 set "INSTALLER_TYPE=msi"
 set "WIN_CONSOLE_OPTION="
 set "APP_VERSION=3.0.0"
-set "WIN_UPGRADE_UUID=B7049603-F325-4AC9-B9E2-46CA1AA46E95"
+rem 3.x intentionally uses a new upgrade identity so Windows Installer does not
+rem ask for missing 2.x MSI sources while installing the reset release.
+set "WIN_UPGRADE_UUID=7F3C6F2A-3A4D-49D6-8E5E-7D52B6F6E0F3"
 
 echo ==========================================
 echo   Leon Exam System Build

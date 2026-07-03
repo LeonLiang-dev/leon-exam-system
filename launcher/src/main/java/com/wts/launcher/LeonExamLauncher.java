@@ -32,9 +32,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -56,6 +58,10 @@ public final class LeonExamLauncher {
     private static final int MAX_PORT = 65535;
     private static final Duration START_TIMEOUT = Duration.ofSeconds(90);
     private static final String APP_JAR_NAME = "wts-app-3.0.0-SNAPSHOT.jar";
+    private static final String OVERWRITE_DATA_ENV = "LEON_EXAM_OVERWRITE_DATA";
+    private static final String OVERWRITE_DATA_ARG = "--overwrite-data";
+    private static final DateTimeFormatter BACKUP_TIMESTAMP =
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final JFrame frame = new JFrame("Leon在线考试系统");
     private final JLabel statusLabel = new JLabel("准备启动");
@@ -73,14 +79,16 @@ public final class LeonExamLauncher {
 
     private final Path appDir;
     private final Path dataRoot;
+    private final boolean overwriteDataRequested;
     private int serverPort = DEFAULT_SERVER_PORT;
     private int databasePort = DEFAULT_DATABASE_PORT;
     private Process databaseProcess;
     private Process serverProcess;
 
-    private LeonExamLauncher() {
+    private LeonExamLauncher(String[] args) {
         this.appDir = resolveAppDir();
         this.dataRoot = resolveDataRoot();
+        this.overwriteDataRequested = isOverwriteDataRequested(args);
         initUi();
         loadLauncherSettings();
         applyPortSettingsToUi();
@@ -96,7 +104,7 @@ public final class LeonExamLauncher {
                 } catch (Exception ignored) {
                     // Keep default Swing look and feel.
                 }
-                LeonExamLauncher launcher = new LeonExamLauncher();
+                LeonExamLauncher launcher = new LeonExamLauncher(args);
                 launcher.frame.setVisible(true);
                 launcher.startAsync();
             } catch (Throwable error) {
@@ -105,6 +113,32 @@ public final class LeonExamLauncher {
                 System.exit(1);
             }
         });
+    }
+
+    private static boolean isOverwriteDataRequested(String[] args) {
+        String envValue = System.getenv(OVERWRITE_DATA_ENV);
+        if (isTruthy(envValue)) {
+            return true;
+        }
+        if (args == null) {
+            return false;
+        }
+        for (String arg : args) {
+            if (OVERWRITE_DATA_ARG.equalsIgnoreCase(arg)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isTruthy(String value) {
+        if (value == null) {
+            return false;
+        }
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "1", "true", "yes", "y", "on" -> true;
+            default -> false;
+        };
     }
 
     private static void writeStartupError(Throwable error) {
@@ -271,7 +305,6 @@ public final class LeonExamLauncher {
         }
         serverPort = selectedServerPort;
         databasePort = selectedDatabasePort;
-        saveLauncherSettings();
     }
 
     private int spinnerPort(JSpinner spinner, String label) {
@@ -332,6 +365,8 @@ public final class LeonExamLauncher {
         appendLog("安装目录: " + appDir);
         appendLog("数据目录: " + dataRoot);
         Files.createDirectories(dataRoot);
+        handleExistingDataOverwrite();
+        saveLauncherSettings();
         Files.createDirectories(dataRoot.resolve("logs"));
         Files.createDirectories(dataRoot.resolve("uploads"));
 
@@ -367,6 +402,93 @@ public final class LeonExamLauncher {
         appendLog("学生访问地址: " + studentUrl);
         appendLog("若学生无法访问，请在 Windows 防火墙中放行 TCP " + serverPort + " 端口。");
         openBrowser(teacherUrl);
+    }
+
+    private void handleExistingDataOverwrite() throws Exception {
+        if (!hasExistingRuntimeData()) {
+            return;
+        }
+        if (!overwriteDataRequested && !confirmOverwriteExistingData()) {
+            appendLog("保留已有运行数据，继续启动。");
+            return;
+        }
+        appendLog("准备覆盖旧运行数据，旧数据会先备份。");
+        Path backupDir = backupAndResetRuntimeData();
+        appendLog("旧运行数据已备份到: " + backupDir);
+    }
+
+    private boolean hasExistingRuntimeData() {
+        return isInitializedDatabaseDirectory(dataRoot.resolve("mysql"))
+                || directoryHasEntries(dataRoot.resolve("uploads"))
+                || Files.exists(dataRoot.resolve("config").resolve("application.yml"))
+                || Files.exists(dataRoot.resolve(".db-initialized"))
+                || Files.exists(dataRoot.resolve(".migrations"));
+    }
+
+    private boolean directoryHasEntries(Path directory) {
+        if (!Files.isDirectory(directory)) {
+            return false;
+        }
+        try (Stream<Path> entries = Files.list(directory)) {
+            return entries.findAny().isPresent();
+        } catch (IOException e) {
+            return true;
+        }
+    }
+
+    private boolean confirmOverwriteExistingData() throws Exception {
+        final int[] result = new int[] { JOptionPane.NO_OPTION };
+        SwingUtilities.invokeAndWait(() -> result[0] = JOptionPane.showConfirmDialog(frame,
+                """
+                检测到旧数据库、上传文件或外部配置。
+
+                选择“是”会先备份旧数据，然后重新初始化干净数据库和文件目录。
+                会重置题库、试卷、答题室、学生、答卷、上传文件和外部配置。
+
+                是否覆盖旧数据？
+                """,
+                "覆盖旧数据",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE));
+        return result[0] == JOptionPane.YES_OPTION;
+    }
+
+    private Path backupAndResetRuntimeData() throws IOException {
+        Path backupRoot = dataRoot.resolve("backup");
+        Path backupDir = uniqueBackupDir(backupRoot);
+        Files.createDirectories(backupDir);
+
+        List<Path> entries = List.of(
+                dataRoot.resolve("mysql"),
+                dataRoot.resolve("uploads"),
+                dataRoot.resolve("config"),
+                dataRoot.resolve("logs"),
+                dataRoot.resolve(".db-initialized"),
+                dataRoot.resolve(".migrations")
+        );
+        for (Path entry : entries) {
+            if (!Files.exists(entry)) {
+                continue;
+            }
+            Path target = backupDir.resolve(entry.getFileName());
+            try {
+                Files.move(entry, target, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new IOException("备份旧数据失败，请先关闭正在运行的 LeonExam 或 MariaDB: " + entry, e);
+            }
+        }
+        return backupDir;
+    }
+
+    private Path uniqueBackupDir(Path backupRoot) {
+        String timestamp = LocalDateTime.now().format(BACKUP_TIMESTAMP);
+        Path candidate = backupRoot.resolve(timestamp);
+        int index = 1;
+        while (Files.exists(candidate)) {
+            candidate = backupRoot.resolve(timestamp + "-" + index);
+            index++;
+        }
+        return candidate;
     }
 
     private boolean initDatabaseFiles(Path mariaDbDir) throws IOException, InterruptedException {
