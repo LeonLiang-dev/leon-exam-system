@@ -4,7 +4,7 @@ import { Card, Tag, Spin, Statistic, Row, Col, Divider, Button, Space, Result } 
 import { CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { getCardResult } from '@/services/exam';
 import { getRequestErrorMessage } from '@/utils/examTime';
-import AnswerValueView, { getCardAnswerDisplayValue } from './AnswerValueView';
+import AnswerValueView, { getCardAnswerDisplayValues } from './AnswerValueView';
 
 const TIPTYPE_LABELS: Record<string, string> = {
   '1': '填空题', '2': '单选题', '3': '多选题',
@@ -143,6 +143,7 @@ const ExamResultPage: React.FC = () => {
           const pointInfoKey = pointInfo.versionid || pointInfo.versionId;
           const subject = subjectMap[pointInfoKey];
           const cardAns = answerMap[pointInfoKey] || [];
+          const displayAnswers = getCardAnswerDisplayValues(cardAns, subject);
           const earnedPoint = pointInfo.point || 0;
           const maxPoint = pointInfo.mpoint || 0;
           const isCorrect = earnedPoint > 0 && maxPoint > 0;
@@ -172,14 +173,14 @@ const ExamResultPage: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: 8, color: '#333' }}>
-                {cardAns.length > 0 ? (
+                {displayAnswers.length > 0 ? (
                   <div>
                     <span style={{ color: '#666' }}>你的答案：</span>
                     <Space wrap align="start" style={{ marginLeft: 4 }}>
-                      {cardAns.map((a: any) => (
+                      {displayAnswers.map((value: string, answerIndex: number) => (
                         <AnswerValueView
-                          key={a.id}
-                          value={getCardAnswerDisplayValue(a, subject)}
+                          key={`${pointInfoKey}-${answerIndex}`}
+                          value={value}
                         />
                       ))}
                     </Space>

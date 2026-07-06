@@ -40,6 +40,18 @@ const SubjectTypePage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{t.name}</span>
           <Tag>{t.children?.length || 0} 子分类</Tag>
+          <PlusOutlined
+            title="新增子分类"
+            style={{ color: '#52c41a', fontSize: 12 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingType(null);
+              setParentId(t.id);
+              form.resetFields();
+              form.setFieldsValue({ sort: 1 });
+              setModalOpen(true);
+            }}
+          />
           <EditOutlined
             style={{ color: '#1890ff', fontSize: 12 }}
             onClick={(e) => {
@@ -136,6 +148,7 @@ const SubjectTypePage: React.FC = () => {
                 setEditingType(null);
                 setParentId(null);
                 form.resetFields();
+                form.setFieldsValue({ sort: 1 });
                 setModalOpen(true);
               }}
             >
@@ -162,7 +175,7 @@ const SubjectTypePage: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingType ? '编辑分类' : '新建分类'}
+        title={editingType ? '编辑分类' : parentId ? '新建子分类' : '新建根分类'}
         open={modalOpen}
         onOk={handleOk}
         onCancel={() => {

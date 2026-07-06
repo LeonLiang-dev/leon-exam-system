@@ -8,8 +8,13 @@ const SELECTION_TIPTYPES = new Set(['2', '3', '4']);
 
 export const getCardAnswerDisplayValue = (cardAnswer: any, subject?: any): string | undefined => {
   const value = cardAnswer?.valstr;
-  if (!subject || !SELECTION_TIPTYPES.has(subject.tiptype) || value !== 'true') {
-    return value;
+  const tiptype = subject?.tiptype != null ? String(subject.tiptype) : undefined;
+  if (!subject || !tiptype || !SELECTION_TIPTYPES.has(tiptype)) {
+    return value || undefined;
+  }
+
+  if (value !== 'true') {
+    return undefined;
   }
 
   const answerId = cardAnswer.answerid || cardAnswer.answerId;
@@ -24,6 +29,11 @@ export const getCardAnswerDisplayValue = (cardAnswer: any, subject?: any): strin
     : '';
   return `${label}${answerOption.answer || answerOption.pcontent || answerOption.id}`;
 };
+
+export const getCardAnswerDisplayValues = (cardAnswers: any[] = [], subject?: any): string[] =>
+  cardAnswers
+    .map((cardAnswer) => getCardAnswerDisplayValue(cardAnswer, subject))
+    .filter((value): value is string => Boolean(value));
 
 interface Props {
   value?: string;

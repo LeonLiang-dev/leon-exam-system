@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, history } from '@umijs/max';
 import { Button, message, Spin, Card, Input, InputNumber, Tag, Space, Divider, Modal } from 'antd';
 import { getCardPaperForReview, getCardResult, judgeCard } from '@/services/exam';
-import AnswerValueView, { getCardAnswerDisplayValue } from './AnswerValueView';
+import AnswerValueView, { getCardAnswerDisplayValues } from './AnswerValueView';
 
 const TIPTYPE_LABELS: Record<string, string> = {
   '1': '填空题', '2': '单选题', '3': '多选题',
@@ -186,6 +186,7 @@ const JudgePage: React.FC = () => {
 
       {allSubjects.map((subject, index) => {
         const userAnswers = answerMap[subject.versionId] || [];
+        const displayAnswers = getCardAnswerDisplayValues(userAnswers, subject);
         const pointInfo = pointMap[subject.versionId];
         const reviewRequired = (pointInfo?.reviewRequired || pointInfo?.reviewrequired) === '1';
         const isSubjective = subject.tiptype === '5';
@@ -214,11 +215,11 @@ const JudgePage: React.FC = () => {
                 <div className="wts-judge-answer-box">
                   <strong>用户答案：</strong>
                   <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {userAnswers.length > 0
-                      ? userAnswers.map((a: any) => (
+                    {displayAnswers.length > 0
+                      ? displayAnswers.map((value: string, answerIndex: number) => (
                         <AnswerValueView
-                          key={a.id}
-                          value={getCardAnswerDisplayValue(a, subject)}
+                          key={`${subject.versionId}-${answerIndex}`}
+                          value={value}
                           block
                         />
                       ))
@@ -298,11 +299,11 @@ const JudgePage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>
                   用户答案：
-                  {userAnswers.length > 0
-                    ? userAnswers.map((a: any) => (
+                  {displayAnswers.length > 0
+                    ? displayAnswers.map((value: string, answerIndex: number) => (
                       <AnswerValueView
-                        key={a.id}
-                        value={getCardAnswerDisplayValue(a, subject)}
+                        key={`${subject.versionId}-${answerIndex}`}
+                        value={value}
                       />
                     ))
                     : <span style={{ color: '#999' }}>未作答</span>}

@@ -49,9 +49,7 @@ const OrganizationPage: React.FC = () => {
   const handleAdd = (parentId?: string) => {
     setEditingOrg(null);
     form.resetFields();
-    if (parentId) {
-      form.setFieldsValue({ parentid: parentId });
-    }
+    form.setFieldsValue({ parentid: parentId || 'NONE', type: '0', sort: 1 });
     setModalOpen(true);
   };
 

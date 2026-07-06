@@ -19,6 +19,7 @@ public class OrganizationService {
 
     private final SysOrganizationMapper organizationMapper;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final String ROOT_PARENT_ID = "NONE";
 
     /**
      * 获取组织树
@@ -29,7 +30,7 @@ public class OrganizationService {
                         .eq(SysOrganization::getState, "1")
                         .orderByAsc(SysOrganization::getSort)
         );
-        return buildTree(all, "NONE");
+        return buildTree(all, ROOT_PARENT_ID);
     }
 
     /**
@@ -46,15 +47,25 @@ public class OrganizationService {
         org.setState("1");
         org.setUuid(id);
 
+        String parentId = normalizeParentId(org.getParentid());
+        org.setParentid(parentId);
+        if (org.getType() == null || org.getType().isBlank()) {
+            org.setType("0");
+        }
+        if (org.getSort() == null) {
+            org.setSort(1);
+        }
+
         // 生成 treecode
-        if (org.getParentid() == null || "NONE".equals(org.getParentid())) {
+        if (ROOT_PARENT_ID.equals(parentId)) {
             org.setTreecode(id);
         } else {
-            SysOrganization parent = organizationMapper.selectById(org.getParentid());
+            SysOrganization parent = organizationMapper.selectById(parentId);
             if (parent == null) {
                 throw BizException.notFound("父组织不存在");
             }
-            org.setTreecode(parent.getTreecode() + id);
+            String parentTreecode = parent.getTreecode() != null ? parent.getTreecode() : parent.getId();
+            org.setTreecode(parentTreecode + id);
         }
 
         organizationMapper.insert(org);
@@ -110,13 +121,15 @@ public class OrganizationService {
 
     private List<OrgTreeNode> buildTree(List<SysOrganization> all, String parentId) {
         return all.stream()
-                .filter(org -> parentId.equals(org.getParentid()))
+                .filter(org -> parentId.equals(normalizeParentId(org.getParentid())))
                 .map(org -> {
                     OrgTreeNode node = new OrgTreeNode();
                     node.setId(org.getId());
                     node.setName(org.getName());
                     node.setType(org.getType());
                     node.setSort(org.getSort());
+                    node.setComments(org.getComments());
+                    node.setParentid(normalizeParentId(org.getParentid()));
                     node.setChildren(buildTree(all, org.getId()));
                     if (node.getChildren().isEmpty()) {
                         node.setChildren(null);
@@ -126,12 +139,21 @@ public class OrganizationService {
                 .collect(Collectors.toList());
     }
 
+    private String normalizeParentId(String parentId) {
+        if (parentId == null || parentId.isBlank()) {
+            return ROOT_PARENT_ID;
+        }
+        return parentId;
+    }
+
     @Data
     public static class OrgTreeNode {
         private String id;
         private String name;
         private String type;
         private Integer sort;
+        private String comments;
+        private String parentid;
         private List<OrgTreeNode> children;
     }
 }
