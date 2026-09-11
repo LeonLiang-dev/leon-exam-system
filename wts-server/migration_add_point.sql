@@ -1,1 +1,0 @@
-ALTER TABLE wts_subject ADD COLUMN point INT DEFAULT 1 AFTER level;

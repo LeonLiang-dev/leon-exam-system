@@ -1,0 +1,6 @@
+# 构建应用镜像时不需要的目录/文件
+.env
+initdb
+app/README.md
+*.md
+.git

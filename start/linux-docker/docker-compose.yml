@@ -1,0 +1,72 @@
+# ============================================================
+# Leon 在线考试系统 — Linux Docker Compose 部署
+#
+# 快速开始:
+#   1. cp .env.example .env 并修改密码/密钥
+#   2. 把构建好的后端 JAR 放到 app/app.jar
+#      (项目根目录先执行 ./build.sh，产物在 dist/wts-app-3.0.0-SNAPSHOT.jar)
+#   3. docker compose up -d --build
+#
+# 学生访问:  http://<服务器IP>:8080
+# 教师访问:  http://<服务器IP>:8080
+#
+# 说明:
+#   - 后端使用 host 网络模式，这样后端能直接看到宿主机真实网卡，
+#     LAN_AUTO_SAME_SUBNET 才能正确自动放行机房所在 /24 网段。
+#   - 数据库只发布到宿主机 127.0.0.1，学生网络访问不到。
+#   - 首次启动时 initdb/ 下的 SQL 会按文件名顺序自动初始化数据库。
+# ============================================================
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: leonexam-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?请在 .env 中设置 DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME:-wts}
+      MARIADB_USER: ${DB_USERNAME:-wts}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置 DB_PASSWORD}
+      TZ: ${TZ:-Asia/Shanghai}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    ports:
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  app:
+    build: .
+    container_name: leonexam-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    network_mode: host
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      DB_URL: jdbc:mysql://127.0.0.1:${DB_PORT:-3306}/${DB_NAME:-wts}?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${DB_USERNAME:-wts}
+      DB_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置 DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?请在 .env 中设置 JWT_SECRET}
+      # 局域网访问控制（默认自动放行服务器所在 /24 网段）
+      LAN_ACCESS_ENABLED: ${LAN_ACCESS_ENABLED:-true}
+      LAN_AUTO_SAME_SUBNET: ${LAN_AUTO_SAME_SUBNET:-true}
+      LAN_ALLOWED_CIDRS: ${LAN_ALLOWED_CIDRS:-}
+      # 附件/上传目录（挂载卷持久化）
+      FILE_UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  db-data:
+  uploads:
