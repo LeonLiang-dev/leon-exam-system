@@ -1,5 +1,6 @@
 package com.wts.auth.security;
 
+import com.wts.auth.service.PermissionService;
 import com.wts.common.security.JwtUtils;
 import com.wts.common.security.LoginUserDetails;
 import jakarta.servlet.FilterChain;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 /**
  * JWT 认证过滤器
  * 从请求头中解析 JWT Token，验证后设置 SecurityContext
+ * 每次请求从数据库重载职位/权限/组织，保证权限调整即时生效
  */
 @Slf4j
 @Component
@@ -28,6 +30,7 @@ import java.util.ArrayList;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+    private final PermissionService permissionService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -46,6 +49,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             userDetails.setLoginName(loginName);
             userDetails.setName(name);
             userDetails.setUserType(userType);
+
+            PermissionService.UserIdentity identity = permissionService.loadIdentity(userId);
+            if (identity != null) {
+                userDetails.setPost(identity.post());
+                userDetails.setPermissions(identity.perms());
+                userDetails.setOrgIds(identity.orgIds());
+            }
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(userDetails, null, new ArrayList<>());

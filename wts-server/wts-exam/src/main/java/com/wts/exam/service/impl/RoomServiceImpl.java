@@ -41,6 +41,11 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public PageResult<ExamRoom> list(int page, int size, String keyword, String pstate) {
+        return list(page, size, keyword, pstate, null);
+    }
+
+    @Override
+    public PageResult<ExamRoom> list(int page, int size, String keyword, String pstate, List<String> ownerIds) {
         LambdaQueryWrapper<ExamRoom> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isEmpty()) {
             wrapper.like(ExamRoom::getName, keyword);
@@ -52,6 +57,9 @@ public class RoomServiceImpl implements RoomService {
             } else {
                 wrapper.in(ExamRoom::getPstate, Arrays.asList(states));
             }
+        }
+        if (ownerIds != null && !ownerIds.isEmpty()) {
+            wrapper.in(ExamRoom::getCuser, ownerIds);
         }
         wrapper.orderByDesc(ExamRoom::getCtime);
         return PageResult.of(roomMapper.selectPage(new Page<>(page, size), wrapper));

@@ -10,6 +10,13 @@ import java.util.List;
 
 public interface RoomService {
     PageResult<ExamRoom> list(int page, int size, String keyword, String pstate);
+
+    /**
+     * 按创建人范围过滤答题室管理列表。
+     *
+     * @param ownerIds 允许的创建人 id 集合；null 表示不限制（平台管理员）
+     */
+    PageResult<ExamRoom> list(int page, int size, String keyword, String pstate, List<String> ownerIds);
     PageResult<ExamRoom> listMyRooms(int page, int size, String userId, String keyword, String pstate);
     ExamRoom getDetail(String id);
     ExamRoom create(RoomDTO dto, String operatorId, String operatorName);

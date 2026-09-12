@@ -10,6 +10,13 @@ import java.util.List;
 
 public interface PaperService {
     PageResult<ExamPaper> list(int page, int size, String keyword);
+
+    /**
+     * 按创建人范围过滤试卷列表。
+     *
+     * @param ownerIds 允许的创建人 id 集合；null 表示不限制（平台管理员）
+     */
+    PageResult<ExamPaper> list(int page, int size, String keyword, List<String> ownerIds);
     ExamPaper getDetail(String id);
     ExamPaper create(PaperDTO dto, String operatorId, String operatorName);
     ExamPaper update(String id, PaperDTO dto, String operatorId);

@@ -29,9 +29,17 @@ public class PaperServiceImpl implements PaperService {
 
     @Override
     public PageResult<ExamPaper> list(int page, int size, String keyword) {
+        return list(page, size, keyword, null);
+    }
+
+    @Override
+    public PageResult<ExamPaper> list(int page, int size, String keyword, List<String> ownerIds) {
         LambdaQueryWrapper<ExamPaper> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isEmpty()) {
             wrapper.like(ExamPaper::getName, keyword);
+        }
+        if (ownerIds != null && !ownerIds.isEmpty()) {
+            wrapper.in(ExamPaper::getCuser, ownerIds);
         }
         wrapper.orderByDesc(ExamPaper::getCtime);
         return PageResult.of(paperMapper.selectPage(new Page<>(page, size), wrapper));

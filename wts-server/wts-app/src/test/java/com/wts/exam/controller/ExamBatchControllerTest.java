@@ -3,6 +3,7 @@ package com.wts.exam.controller;
 import com.wts.common.exception.BizException;
 import com.wts.common.security.CurrentUserProvider;
 import com.wts.common.security.LoginUserDetails;
+import com.wts.auth.service.PermissionService;
 import com.wts.exam.dto.BatchIdsDTO;
 import com.wts.exam.service.CardService;
 import com.wts.exam.service.PaperService;
@@ -45,6 +46,8 @@ class ExamBatchControllerTest {
     private RandomService randomService;
     @Mock
     private CardService cardService;
+    @Mock
+    private PermissionService permissionService;
 
     private final CurrentUserProvider currentUserProvider = new CurrentUserProvider();
 
@@ -69,7 +72,7 @@ class ExamBatchControllerTest {
 
     @Test
     void subjectBatchDeleteDelegatesNormalizedIds() {
-        SubjectController controller = new SubjectController(subjectService, subjectImportService, currentUserProvider);
+        SubjectController controller = new SubjectController(subjectService, subjectImportService, currentUserProvider, permissionService);
 
         controller.batchDelete(batchIds(" subject-1 ", "subject-2", "subject-1"));
 
@@ -78,7 +81,7 @@ class ExamBatchControllerTest {
 
     @Test
     void paperBatchDeleteDelegatesNormalizedIds() {
-        PaperController controller = new PaperController(paperService, currentUserProvider);
+        PaperController controller = new PaperController(paperService, currentUserProvider, permissionService);
 
         controller.batchDelete(batchIds(" paper-1 ", "paper-2", "paper-1"));
 
@@ -87,7 +90,7 @@ class ExamBatchControllerTest {
 
     @Test
     void roomBatchActionsDelegateNormalizedIds() {
-        RoomController controller = new RoomController(roomService, currentUserProvider);
+        RoomController controller = new RoomController(roomService, currentUserProvider, permissionService);
         BatchIdsDTO dto = batchIds(" room-1 ", "room-2", "room-1");
 
         controller.batchPublish(dto);
@@ -102,7 +105,7 @@ class ExamBatchControllerTest {
 
     @Test
     void randomBatchDeletesDelegateNormalizedIds() {
-        RandomController controller = new RandomController(randomService, currentUserProvider);
+        RandomController controller = new RandomController(randomService, currentUserProvider, permissionService);
         BatchIdsDTO dto = batchIds(" item-1 ", "item-2", "item-1");
 
         controller.batchDeleteItems(dto);
@@ -124,12 +127,14 @@ class ExamBatchControllerTest {
     @Test
     void studentCannotBatchDeleteSubjects() {
         authenticate("student-1", "student", "Student One", "2");
-        SubjectController controller = new SubjectController(subjectService, subjectImportService, currentUserProvider);
+        SubjectController controller = new SubjectController(subjectService, subjectImportService, currentUserProvider, permissionService);
 
+        org.mockito.Mockito.doThrow(BizException.forbidden("无权操作"))
+                .when(permissionService).require(any(), any());
         BizException error = assertThrows(BizException.class,
                 () -> controller.batchDelete(batchIds("subject-1")));
 
-        assertEquals(400, error.getCode());
+        assertEquals(403, error.getCode());
         verify(subjectService, never()).deleteBatch(any(), any());
     }
 

@@ -14,6 +14,7 @@ import com.wts.exam.mapper.*;
 import com.wts.exam.service.CardService;
 import com.wts.exam.util.ExamTimeUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,8 @@ public class CardServiceImpl implements CardService {
     private static final String REVIEW_REQUIRED = "1";
     private static final String REVIEW_NOT_REQUIRED = "0";
     private static final String REVIEW_REASON_SUBJECTIVE = "SUBJECTIVE";
+    private static final String OVERTIME_YES = "1";
+    private static final String OVERTIME_NO = "0";
 
     @Override
     @Transactional
@@ -67,7 +70,7 @@ public class CardServiceImpl implements CardService {
         if (!roomAdmin) {
             roomParticipationPolicy.requireParticipant(room, userId);
         }
-        ensureRoomAllowsAnswer(room);
+        ensureRoomAllowsEnter(room);
 
         ExamCard existing = cardMapper.selectOne(
                 new LambdaQueryWrapper<ExamCard>()
@@ -101,7 +104,20 @@ public class CardServiceImpl implements CardService {
         card.setRoomuuid(roomId);
         card.setPaperuuid(roomPapers.get(0).getPaperid());
         card.setStatistical("0");
-        cardMapper.insert(card);
+        try {
+            cardMapper.insert(card);
+        } catch (DuplicateKeyException e) {
+            // 并发/重复进入兜底：已存在作答卡则以已有卡继续，避免产生重复答卷
+            ExamCard conflict = cardMapper.selectOne(
+                    new LambdaQueryWrapper<ExamCard>()
+                            .eq(ExamCard::getRoomid, roomId)
+                            .eq(ExamCard::getUserid, userId)
+                            .eq(ExamCard::getPstate, CARD_IN_PROGRESS));
+            if (conflict != null) {
+                return conflict;
+            }
+            throw e;
+        }
         return card;
     }
 
@@ -111,7 +127,7 @@ public class CardServiceImpl implements CardService {
         ExamCard card = cardMapper.selectById(cardId);
         if (card == null) throw BizException.notFound("答卷");
         ensureCardOwner(card, userId);
-        ensureCardCanAnswer(card);
+        ensureCardCanSave(card);
         saveAnswersForCard(cardId, dto, userId);
     }
 
@@ -176,10 +192,14 @@ public class CardServiceImpl implements CardService {
         ExamCard card = cardMapper.selectById(cardId);
         if (card == null) throw BizException.notFound("答卷");
         ensureCardOwner(card, userId);
-        ensureCardCanAnswer(card);
+        // 交卷不校验答题时间窗：时间到后仍允许提交，避免学生答案丢失；是否超时通过 overtime 标记
+        ensureCardActive(card);
+        ExamRoom room = roomMapper.selectById(card.getRoomid());
+        boolean overtime = isOvertime(card, room);
         saveAnswersForCard(cardId, dto, userId);
         boolean needsManualReview = autoGrade(card);
         String now = ExamTimeUtils.nowCompact();
+        card.setOvertime(overtime ? OVERTIME_YES : OVERTIME_NO);
         card.setPstate(needsManualReview ? CARD_SUBMITTED : CARD_JUDGED);
         card.setSubmittime(now);
         if (!needsManualReview) {
@@ -514,7 +534,8 @@ public class CardServiceImpl implements CardService {
         ExamCard card = cardMapper.selectById(cardId);
         if (card == null) throw BizException.notFound("答卷");
         ensureCardOwner(card, userId);
-        ensureCardCanAnswer(card);
+        // 仅校验答卷可操作状态（含答题室结束后），保证学生可回看试卷并交卷
+        ensureCardActive(card);
 
         return buildExamPaper(card, false);
     }
@@ -653,23 +674,17 @@ public class CardServiceImpl implements CardService {
         }
     }
 
-    private void ensureCardCanAnswer(ExamCard card) {
-        if (!CARD_IN_PROGRESS.equals(card.getPstate())) {
-            throw BizException.fail("答卷已提交，无法修改");
-        }
-        ExamRoom room = roomMapper.selectById(card.getRoomid());
-        if (room == null) throw BizException.notFound("答题室");
-        ensureRoomAllowsAnswer(room);
-    }
-
-    private void ensureRoomAllowsAnswer(ExamRoom room) {
+    /**
+     * 进入答题室前校验：答题室已发布、未关闭，且当前在开始/结束时间窗口内。
+     * 个人答题时长在此阶段不参与判断（进入后才开始计时）。
+     */
+    private void ensureRoomAllowsEnter(ExamRoom room) {
         if (ROOM_CLOSED.equals(room.getPstate())) {
             throw BizException.fail("答题室已关闭，无法作答");
         }
         if (!ROOM_PUBLISHED.equals(room.getPstate())) {
             throw BizException.fail("答题室未开放");
         }
-
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = ExamTimeUtils.parseNullable(room.getStarttime());
         if (start != null && now.isBefore(start)) {
@@ -679,6 +694,64 @@ public class CardServiceImpl implements CardService {
         if (end != null && now.isAfter(end)) {
             throw BizException.fail("答题室已结束，无法作答");
         }
+    }
+
+    /**
+     * 答卷处于可操作状态：进行中 + 答题室已发布且未关闭。
+     * 不校验时间窗，供交卷 / 试卷查看使用，保证考试结束后仍能交卷与回看。
+     */
+    private void ensureCardActive(ExamCard card) {
+        if (!CARD_IN_PROGRESS.equals(card.getPstate())) {
+            throw BizException.fail("答卷已提交，无法修改");
+        }
+        ExamRoom room = roomMapper.selectById(card.getRoomid());
+        if (room == null) throw BizException.notFound("答题室");
+        if (ROOM_CLOSED.equals(room.getPstate())) {
+            throw BizException.fail("答题室已关闭，无法作答");
+        }
+        if (!ROOM_PUBLISHED.equals(room.getPstate())) {
+            throw BizException.fail("答题室未开放");
+        }
+    }
+
+    /**
+     * 暂存答案前校验时间窗：答题室未开始/已结束、或个人答题时长（starttime + timelen）已超时，
+     * 均不允许再修改答案。交卷不受此限制。
+     */
+    private void ensureCardCanSave(ExamCard card) {
+        ensureCardActive(card);
+        ExamRoom room = roomMapper.selectById(card.getRoomid());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = ExamTimeUtils.parseNullable(room.getStarttime());
+        if (start != null && now.isBefore(start)) {
+            throw BizException.fail("答题室未开始");
+        }
+        LocalDateTime end = ExamTimeUtils.parseNullable(room.getEndtime());
+        if (end != null && now.isAfter(end)) {
+            throw BizException.fail("答题室已结束，无法作答");
+        }
+        LocalDateTime answerStart = ExamTimeUtils.parseNullable(card.getStarttime());
+        Integer timelen = room.getTimelen();
+        if (answerStart != null && timelen != null && timelen > 0
+                && now.isAfter(answerStart.plusMinutes(timelen))) {
+            throw BizException.fail("答题时间已到，请交卷");
+        }
+    }
+
+    /**
+     * 判断交卷是否超时：超过答题室结束时间，或超过个人答题时长（进入时间 + 答题时长）。
+     */
+    private boolean isOvertime(ExamCard card, ExamRoom room) {
+        if (room == null) return false;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime end = ExamTimeUtils.parseNullable(room.getEndtime());
+        if (end != null && now.isAfter(end)) {
+            return true;
+        }
+        LocalDateTime answerStart = ExamTimeUtils.parseNullable(card.getStarttime());
+        Integer timelen = room.getTimelen();
+        return answerStart != null && timelen != null && timelen > 0
+                && now.isAfter(answerStart.plusMinutes(timelen));
     }
 
     private List<ExamPaperVO.SubjectVO> buildSubjectVOs(

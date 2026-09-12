@@ -12,4 +12,6 @@ public class LoginVO {
     private String loginName;
     private String name;
     private String userType;
+    /** 职位（student/teacher/director/deputy/platform_admin） */
+    private String post;
 }

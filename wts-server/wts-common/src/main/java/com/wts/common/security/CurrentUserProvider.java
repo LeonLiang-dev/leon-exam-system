@@ -34,7 +34,10 @@ public class CurrentUserProvider {
                 userDetails.getUserId(),
                 userDetails.getLoginName(),
                 userDetails.getName(),
-                userDetails.getUserType()
+                userDetails.getUserType(),
+                userDetails.getPost(),
+                userDetails.getPermissions(),
+                userDetails.getOrgIds()
         );
     }
 }

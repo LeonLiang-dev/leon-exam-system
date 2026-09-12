@@ -35,6 +35,11 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     public PageResult<ExamSubject> list(SubjectQueryDTO query) {
+        return list(query, null);
+    }
+
+    @Override
+    public PageResult<ExamSubject> list(SubjectQueryDTO query, List<String> ownerIds) {
         LambdaQueryWrapper<ExamSubject> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(query.getKeyword())) {
             wrapper.like(ExamSubject::getIntroduction, query.getKeyword());
@@ -45,12 +50,35 @@ public class SubjectServiceImpl implements SubjectService {
         if (StringUtils.hasText(query.getPstate())) {
             wrapper.eq(ExamSubject::getPstate, query.getPstate());
         }
+        applyOwnerScope(wrapper, ownerIds);
         // Filter by tiptype via version subquery is complex; for now filter by typeid
         wrapper.orderByDesc(ExamSubject::getUuid);
 
         Page<ExamSubject> page = subjectMapper.selectPage(
                 new Page<>(query.getPage(), query.getSize()), wrapper);
         return PageResult.of(page);
+    }
+
+    /**
+     * 创建人范围过滤：题目主表无创建人字段，通过其当前版本(version.cuser)反查。
+     */
+    private void applyOwnerScope(LambdaQueryWrapper<ExamSubject> wrapper, List<String> ownerIds) {
+        if (ownerIds == null) {
+            return;
+        }
+        if (ownerIds.isEmpty()) {
+            wrapper.eq(ExamSubject::getUuid, "__NONE__");
+            return;
+        }
+        List<String> versionIds = versionMapper.selectList(
+                        new LambdaQueryWrapper<ExamSubjectVersion>()
+                                .in(ExamSubjectVersion::getCuser, ownerIds))
+                .stream().map(ExamSubjectVersion::getId).distinct().toList();
+        if (versionIds.isEmpty()) {
+            wrapper.eq(ExamSubject::getUuid, "__NONE__");
+        } else {
+            wrapper.in(ExamSubject::getVersionid, versionIds);
+        }
     }
 
     @Override

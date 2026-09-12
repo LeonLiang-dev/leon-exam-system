@@ -96,7 +96,22 @@ public class AuthService {
         vo.setLoginName(user.getLoginname());
         vo.setName(user.getName());
         vo.setUserType(user.getType());
+        vo.setPost(resolvePost(user));
         return vo;
+    }
+
+    /** 职位缺失时按旧 type 推导，保证登录响应总是带 post */
+    private String resolvePost(SysUser user) {
+        if (user.getPost() != null && !user.getPost().isBlank()) {
+            return user.getPost();
+        }
+        if ("2".equals(user.getType())) {
+            return "student";
+        }
+        if ("3".equals(user.getType())) {
+            return "platform_admin";
+        }
+        return "teacher";
     }
 
     /**
@@ -128,6 +143,7 @@ public class AuthService {
         vo.setLoginName(user.getLoginname());
         vo.setName(user.getName());
         vo.setUserType(user.getType());
+        vo.setPost(resolvePost(user));
         return vo;
     }
 

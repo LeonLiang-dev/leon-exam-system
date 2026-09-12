@@ -5,6 +5,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -18,7 +19,11 @@ public class LoginUserDetails implements UserDetails {
     private String name;
     private String password;
     private String userType;
+    /** 职位: student/teacher/director/deputy/platform_admin */
+    private String post;
     private Set<String> permissions;
+    /** 用户所属组织节点 id 列表 */
+    private List<String> orgIds;
     private Collection<? extends GrantedAuthority> authorities;
 
     @Override

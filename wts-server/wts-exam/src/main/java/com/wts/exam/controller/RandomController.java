@@ -1,5 +1,7 @@
 package com.wts.exam.controller;
 
+import com.wts.auth.enums.Permission;
+import com.wts.auth.service.PermissionService;
 import com.wts.common.result.R;
 import com.wts.common.security.CurrentUser;
 import com.wts.common.security.CurrentUserProvider;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class RandomController {
     private final RandomService service;
     private final CurrentUserProvider currentUserProvider;
+    private final PermissionService permissionService;
 
     @GetMapping("/random-items")
     public R<?> listItems() {
@@ -24,21 +27,21 @@ public class RandomController {
     @PostMapping("/random-items")
     public R<?> createItem(@RequestBody RandomItemDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         return R.ok(service.createItem(dto, user.id()));
     }
 
     @PutMapping("/random-items/{id}")
     public R<?> updateItem(@PathVariable String id, @RequestBody RandomItemDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         return R.ok(service.updateItem(id, dto));
     }
 
     @DeleteMapping("/random-items/{id}")
     public R<?> deleteItem(@PathVariable String id) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         service.deleteItem(id);
         return R.ok();
     }
@@ -46,7 +49,7 @@ public class RandomController {
     @PostMapping("/random-items/batch-delete")
     public R<?> batchDeleteItems(@RequestBody BatchIdsDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         service.deleteItemsBatch(dto.normalizedIds());
         return R.ok();
     }
@@ -59,21 +62,21 @@ public class RandomController {
     @PostMapping("/random-items/{itemId}/steps")
     public R<?> addStep(@PathVariable String itemId, @RequestBody RandomItemDTO.RandomStepDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         return R.ok(service.addStep(itemId, dto));
     }
 
     @PutMapping("/random-steps/{id}")
     public R<?> updateStep(@PathVariable String id, @RequestBody RandomItemDTO.RandomStepDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         return R.ok(service.updateStep(id, dto));
     }
 
     @DeleteMapping("/random-steps/{id}")
     public R<?> deleteStep(@PathVariable String id) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         service.deleteStep(id);
         return R.ok();
     }
@@ -81,7 +84,7 @@ public class RandomController {
     @PostMapping("/random-steps/batch-delete")
     public R<?> batchDeleteSteps(@RequestBody BatchIdsDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         service.deleteStepsBatch(dto.normalizedIds());
         return R.ok();
     }
@@ -90,13 +93,7 @@ public class RandomController {
     public R<?> generate(@PathVariable String itemId,
                          @RequestParam(defaultValue = "1") int count) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
         return R.ok(service.generatePapers(itemId, count, user.id()));
-    }
-
-    private void requireAdmin(CurrentUser user) {
-        if (!user.isAdmin()) {
-            throw com.wts.common.exception.BizException.fail("无权限操作");
-        }
     }
 }

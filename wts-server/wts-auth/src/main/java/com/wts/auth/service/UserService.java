@@ -6,6 +6,7 @@ import com.wts.auth.dto.StudentImportResult;
 import com.wts.auth.dto.UserDTO;
 import com.wts.auth.entity.SysUser;
 import com.wts.auth.entity.SysUserorg;
+import com.wts.auth.enums.UserPost;
 import com.wts.auth.mapper.SysUserMapper;
 import com.wts.auth.mapper.SysUserorgMapper;
 import com.wts.common.exception.BizException;
@@ -49,8 +50,11 @@ public class UserService {
 
     /**
      * 用户分页列表
+     *
+     * @param scopeUserIds 可见用户 id 集合；null 表示不限制（平台管理员）
      */
-    public PageResult<SysUser> listUsers(int page, int size, String keyword, String state) {
+    public PageResult<SysUser> listUsers(int page, int size, String keyword, String state,
+                                         String post, String className, List<String> scopeUserIds) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w
@@ -60,6 +64,19 @@ public class UserService {
         }
         if (StringUtils.hasText(state)) {
             wrapper.eq(SysUser::getState, state);
+        }
+        if (StringUtils.hasText(post)) {
+            wrapper.eq(SysUser::getPost, post);
+        }
+        if (StringUtils.hasText(className)) {
+            wrapper.like(SysUser::getClassName, className);
+        }
+        if (scopeUserIds != null) {
+            if (scopeUserIds.isEmpty()) {
+                wrapper.eq(SysUser::getId, "__NONE__");
+            } else {
+                wrapper.in(SysUser::getId, scopeUserIds);
+            }
         }
         wrapper.orderByDesc(SysUser::getCtime);
 
@@ -98,7 +115,10 @@ public class UserService {
         user.setMuser(operatorId);
         user.setUuid(user.getId());
 
+        applyIdentityFields(user, dto, now);
         userMapper.insert(user);
+
+        bindOrganization(user.getId(), dto.getOrgId());
         user.setPassword(null);
         return user;
     }
@@ -119,12 +139,49 @@ public class UserService {
         if (StringUtils.hasText(dto.getState())) user.setState(dto.getState());
         if (dto.getComments() != null) user.setComments(dto.getComments());
         if (StringUtils.hasText(dto.getImgid())) user.setImgid(dto.getImgid());
+        if (dto.getClassName() != null) user.setClassName(dto.getClassName());
+        if (StringUtils.hasText(dto.getPost())) {
+            user.setPost(dto.getPost());
+            user.setPerms(dto.getPerms() != null ? dto.getPerms() : String.join(",", PermissionService.defaultPerms(dto.getPost())));
+        }
         user.setUtime(now);
         user.setMuser(operatorId);
 
         userMapper.updateById(user);
+
+        if (dto.getOrgId() != null) {
+            bindOrganization(id, dto.getOrgId());
+        }
         user.setPassword(null);
         return user;
+    }
+
+    /** 设置职位/权限/班级（职位未显式指定时由 type 推导） */
+    private void applyIdentityFields(SysUser user, UserDTO dto, String now) {
+        String post;
+        if (StringUtils.hasText(dto.getPost())) {
+            post = dto.getPost();
+        } else {
+            post = "2".equals(user.getType()) ? UserPost.STUDENT.code() : UserPost.TEACHER.code();
+        }
+        user.setPost(post);
+        user.setPerms(StringUtils.hasText(dto.getPerms())
+                ? dto.getPerms()
+                : String.join(",", PermissionService.defaultPerms(post)));
+        user.setClassName(dto.getClassName());
+    }
+
+    /** 维护用户-组织归属（先清后插，保证唯一归属） */
+    private void bindOrganization(String userId, String orgId) {
+        if (!StringUtils.hasText(orgId)) {
+            return;
+        }
+        userorgMapper.delete(new LambdaQueryWrapper<SysUserorg>().eq(SysUserorg::getUserid, userId));
+        SysUserorg userorg = new SysUserorg();
+        userorg.setId(UUID.randomUUID().toString().replace("-", ""));
+        userorg.setUserid(userId);
+        userorg.setOrganizationid(orgId);
+        userorgMapper.insert(userorg);
     }
 
     /**
@@ -268,8 +325,8 @@ public class UserService {
 
                 String studentNo = getCellText(row, 0, formatter);
                 String name = getCellText(row, 1, formatter);
-                String comments = getCellText(row, 2, formatter);
-                if (!StringUtils.hasText(studentNo) && !StringUtils.hasText(name) && !StringUtils.hasText(comments)) {
+                String className = getCellText(row, 2, formatter);
+                if (!StringUtils.hasText(studentNo) && !StringUtils.hasText(name) && !StringUtils.hasText(className)) {
                     continue;
                 }
 
@@ -288,7 +345,7 @@ public class UserService {
                 }
 
                 try {
-                    importStudent(studentNo, name, comments, operatorId, result);
+                    importStudent(studentNo, name, className, operatorId, result);
                 } catch (Exception e) {
                     result.addError("第" + rowNum + "行: " + e.getMessage());
                 }
@@ -305,7 +362,7 @@ public class UserService {
     private void importStudent(
             String studentNo,
             String name,
-            String comments,
+            String className,
             String operatorId,
             StudentImportResult result) {
         String now = LocalDateTime.now().format(FMT);
@@ -319,8 +376,10 @@ public class UserService {
             user.setLoginname(studentNo);
             user.setPassword(passwordEncoder.encode(DEFAULT_STUDENT_PASSWORD));
             user.setType(STUDENT_TYPE);
+            user.setPost(UserPost.STUDENT.code());
             user.setState(ENABLED_STATE);
-            user.setComments(comments);
+            user.setComments(className);
+            user.setClassName(className);
             user.setCtime(now);
             user.setUtime(now);
             user.setCuser(operatorId);
@@ -333,8 +392,10 @@ public class UserService {
 
         existing.setName(name);
         existing.setType(STUDENT_TYPE);
+        existing.setPost(UserPost.STUDENT.code());
         existing.setState(ENABLED_STATE);
-        existing.setComments(comments);
+        existing.setComments(className);
+        existing.setClassName(className);
         existing.setUtime(now);
         existing.setMuser(operatorId);
         userMapper.updateById(existing);

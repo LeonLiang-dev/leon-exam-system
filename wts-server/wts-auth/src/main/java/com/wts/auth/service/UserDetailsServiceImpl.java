@@ -26,6 +26,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     private final SysUserMapper userMapper;
     private final SysActiontreeMapper actiontreeMapper;
+    private final PermissionService permissionService;
 
     @Override
     public UserDetails loadUserByUsername(String loginName) throws UsernameNotFoundException {
@@ -46,6 +47,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         details.setPassword(user.getPassword());
         details.setUserType(user.getType());
         details.setAuthorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+
+        PermissionService.UserIdentity identity = permissionService.loadIdentity(user.getId());
+        if (identity != null) {
+            details.setPost(identity.post());
+            details.setPermissions(identity.perms());
+            details.setOrgIds(identity.orgIds());
+        }
 
         return details;
     }

@@ -13,6 +13,7 @@ import com.wts.auth.entity.SysUser;
 import com.wts.auth.mapper.SysUserMapper;
 import com.wts.auth.service.AuthService;
 import com.wts.auth.service.OrganizationService;
+import com.wts.auth.service.PermissionService;
 import com.wts.auth.service.UserService;
 import com.wts.common.result.PageResult;
 import com.wts.common.result.R;
@@ -37,6 +38,7 @@ import com.wts.exam.entity.ExamRoomPaper;
 import com.wts.exam.entity.ExamRoomUser;
 import com.wts.exam.entity.ExamSubject;
 import com.wts.exam.entity.ExamSubjectType;
+import com.wts.exam.entity.ExamSubjectVersion;
 import com.wts.exam.mapper.ExamCardMapper;
 import com.wts.exam.mapper.ExamPaperMapper;
 import com.wts.exam.mapper.ExamRoomMapper;
@@ -67,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -103,6 +106,8 @@ class AllApiControllerSmokeTest {
     private ExamCardMapper cardMapper;
     @Mock
     private SysUserMapper userMapper;
+    @Mock
+    private PermissionService permissionService;
 
     private final CurrentUserProvider currentUserProvider = new CurrentUserProvider();
 
@@ -140,26 +145,26 @@ class AllApiControllerSmokeTest {
 
     @Test
     void userEndpointsAreCallable() {
-        UserController controller = new UserController(userService);
-        LoginUserDetails loginUser = loginUser("admin-1", "admin", "Admin One", "1");
+        UserController controller = new UserController(userService, permissionService, currentUserProvider);
         MockMultipartFile file = new MockMultipartFile("file", "students.xlsx", "application/vnd.ms-excel", "content".getBytes());
         com.wts.auth.dto.BatchIdsDTO batchIds = authBatchIds("user-1", "user-2");
 
-        when(userService.listUsers(1, 20, "kw", "1")).thenReturn(PageResult.of(List.of(sysUser("user-1")), 1, 1, 20));
+        when(userService.listUsers(1, 20, "kw", "1", null, null, null)).thenReturn(PageResult.of(List.of(sysUser("user-1")), 1, 1, 20));
+        when(permissionService.visibleUserIds(any())).thenReturn(null);
         when(userService.createUser(any(UserDTO.class), eq("admin-1"))).thenReturn(sysUser("user-1"));
         when(userService.importStudents(any(InputStream.class), eq("admin-1"))).thenReturn(new StudentImportResult());
         when(userService.updateUser(eq("user-1"), any(UserDTO.class), eq("admin-1"))).thenReturn(sysUser("user-1"));
 
-        assertOk(controller.list(1, 20, "kw", "1"));
-        assertOk(controller.create(new UserDTO(), loginUser));
-        assertOk(controller.importStudents(file, loginUser));
-        assertOk(controller.update("user-1", new UserDTO(), loginUser));
-        assertOk(controller.delete("user-1", loginUser));
-        assertOk(controller.batchDisable(batchIds, loginUser));
-        assertOk(controller.hardDelete("user-1", loginUser));
-        assertOk(controller.batchHardDelete(batchIds, loginUser));
-        assertOk(controller.resetPassword("user-1", loginUser));
-        assertOk(controller.changePassword(Map.of("oldPassword", "old-pass", "newPassword", "new-pass"), loginUser));
+        assertOk(controller.list(1, 20, "kw", "1", null, null));
+        assertOk(controller.create(new UserDTO()));
+        assertOk(controller.importStudents(file));
+        assertOk(controller.update("user-1", new UserDTO()));
+        assertOk(controller.delete("user-1"));
+        assertOk(controller.batchDisable(batchIds));
+        assertOk(controller.hardDelete("user-1"));
+        assertOk(controller.batchHardDelete(batchIds));
+        assertOk(controller.resetPassword("user-1"));
+        assertOk(controller.changePassword(Map.of("oldPassword", "old-pass", "newPassword", "new-pass")));
 
         verify(userService).disableUsers(List.of("user-1", "user-2"), "admin-1");
         verify(userService).hardDeleteUsers(List.of("user-1", "user-2"), "admin-1");
@@ -195,12 +200,14 @@ class AllApiControllerSmokeTest {
 
     @Test
     void subjectEndpointsAreCallable() {
-        SubjectController controller = new SubjectController(subjectService, subjectImportService, currentUserProvider);
+        SubjectController controller = new SubjectController(subjectService, subjectImportService, currentUserProvider, permissionService);
         MockMultipartFile file = new MockMultipartFile("file", "subjects.xlsx", "application/vnd.ms-excel", "content".getBytes());
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(subjectService.list(any(SubjectQueryDTO.class))).thenReturn(PageResult.of(List.of(new ExamSubject()), 1, 1, 20));
+        when(subjectService.list(any(SubjectQueryDTO.class), isNull())).thenReturn(PageResult.of(List.of(new ExamSubject()), 1, 1, 20));
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
         when(subjectService.getDetail("subject-1")).thenReturn(new ExamSubject());
+        when(subjectService.getCurrentVersion("subject-1")).thenReturn(new ExamSubjectVersion());
         when(subjectService.create(any(SubjectDTO.class), eq("admin-1"), eq("Admin One"))).thenReturn(new ExamSubject());
         when(subjectImportService.importFromExcel(any(InputStream.class), eq("type-1"), eq("admin-1"), eq("Admin One")))
                 .thenReturn(Map.of("created", 1));
@@ -220,9 +227,10 @@ class AllApiControllerSmokeTest {
 
     @Test
     void paperEndpointsAreCallable() {
-        PaperController controller = new PaperController(paperService, currentUserProvider);
+        PaperController controller = new PaperController(paperService, currentUserProvider, permissionService);
 
-        when(paperService.list(1, 20, "paper")).thenReturn(PageResult.of(List.of(new ExamPaper()), 1, 1, 20));
+        when(paperService.list(1, 20, "paper", null)).thenReturn(PageResult.of(List.of(new ExamPaper()), 1, 1, 20));
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
         when(paperService.getDetail("paper-1")).thenReturn(new ExamPaper());
         when(paperService.create(any(PaperDTO.class), eq("admin-1"), eq("Admin One"))).thenReturn(new ExamPaper());
         when(paperService.getChapters("paper-1")).thenReturn(List.of(new ExamPaperChapter()));
@@ -243,9 +251,10 @@ class AllApiControllerSmokeTest {
 
     @Test
     void roomEndpointsAreCallable() {
-        RoomController controller = new RoomController(roomService, currentUserProvider);
+        RoomController controller = new RoomController(roomService, currentUserProvider, permissionService);
 
-        when(roomService.list(1, 20, "room", "21")).thenReturn(PageResult.of(List.of(new ExamRoom()), 1, 1, 20));
+        when(roomService.list(1, 20, "room", "21", null)).thenReturn(PageResult.of(List.of(new ExamRoom()), 1, 1, 20));
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
         when(roomService.listMyRooms(1, 20, "admin-1", "room", "21")).thenReturn(PageResult.of(List.of(new ExamRoom()), 1, 1, 20));
         when(roomService.getDetail("room-1")).thenReturn(new ExamRoom());
         when(roomService.create(any(RoomDTO.class), eq("admin-1"), eq("Admin One"))).thenReturn(new ExamRoom());
@@ -295,7 +304,7 @@ class AllApiControllerSmokeTest {
 
     @Test
     void randomEndpointsAreCallable() {
-        RandomController controller = new RandomController(randomService, currentUserProvider);
+        RandomController controller = new RandomController(randomService, currentUserProvider, permissionService);
         RandomItemDTO itemDTO = new RandomItemDTO();
         RandomItemDTO.RandomStepDTO stepDTO = new RandomItemDTO.RandomStepDTO();
 
