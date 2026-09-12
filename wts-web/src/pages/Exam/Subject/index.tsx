@@ -120,6 +120,7 @@ const SubjectPage: React.FC = () => {
   const [importTypeid, setImportTypeid] = useState<string>('');
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [form] = Form.useForm();
   const questionImage = Form.useWatch('pcontent', form);
 
   useEffect(() => {
