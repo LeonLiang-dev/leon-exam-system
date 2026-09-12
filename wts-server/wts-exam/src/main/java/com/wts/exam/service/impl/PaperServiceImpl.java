@@ -142,7 +142,9 @@ public class PaperServiceImpl implements PaperService {
         ps.setSubjectid(subjectId);
         ps.setVersionid(versionId != null ? versionId : subject.getVersionid());
         ps.setChapterid(resolveChapterId(paperId, chapterId));
-        ps.setPoint(point != null ? point : 0);
+        // 未显式传分值/传 0 时回退到题目默认分，避免加题后得 0 分
+        Integer resolvedPoint = point != null && point > 0 ? point : (subject.getPoint() != null ? subject.getPoint() : 0);
+        ps.setPoint(resolvedPoint);
         if (sort != null) {
             ps.setSort(sort);
         } else {

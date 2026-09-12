@@ -236,7 +236,7 @@ public class SubjectServiceImpl implements SubjectService {
                 answer.setAnswernote(valueOrEmpty(ansDto.getAnswernote()));
                 answer.setRightanswer(valueOrDefault(ansDto.getRightanswer(), "0"));
                 answer.setSort(ansDto.getSort() != null ? ansDto.getSort() : 1);
-                answer.setPointweight(ansDto.getPointweight() != null ? ansDto.getPointweight() : 0);
+                answer.setPointweight(defaultAnswerPointweight(dto.getTiptype(), ansDto.getPointweight()));
                 answer.setGroupno(ansDto.getGroupno());
                 answer.setPcontent(valueOrEmpty(ansDto.getPcontent()));
                 answer.setPstate("1");
@@ -286,7 +286,7 @@ public class SubjectServiceImpl implements SubjectService {
                 answer.setAnswernote(valueOrEmpty(ansDto.getAnswernote()));
                 answer.setRightanswer(valueOrDefault(ansDto.getRightanswer(), "0"));
                 answer.setSort(ansDto.getSort() != null ? ansDto.getSort() : 1);
-                answer.setPointweight(ansDto.getPointweight() != null ? ansDto.getPointweight() : 0);
+                answer.setPointweight(defaultAnswerPointweight(dto.getTiptype(), ansDto.getPointweight()));
                 answer.setGroupno(ansDto.getGroupno());
                 answer.setPcontent(valueOrEmpty(ansDto.getPcontent()));
                 answer.setPstate("1");
@@ -350,5 +350,13 @@ public class SubjectServiceImpl implements SubjectService {
 
     private String valueOrDefault(String value, String defaultValue) {
         return value != null && !value.isBlank() ? value : defaultValue;
+    }
+
+    /** 判断题未显式传权重时，正确项默认 100（两个选项，答对即满分） */
+    private Integer defaultAnswerPointweight(String tiptype, Integer pointweight) {
+        if (pointweight != null) {
+            return pointweight;
+        }
+        return "4".equals(tiptype) ? 100 : 0;
     }
 }

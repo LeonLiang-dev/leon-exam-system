@@ -173,6 +173,42 @@ class PaperServiceImplTest {
         verify(paperMapper, never()).deleteById(any());
     }
 
+    @Test
+    void addSubjectFallsBackToSubjectDefaultPointWhenPointMissing() {
+        ExamSubject subject = subject("subject-1", "version-current");
+        subject.setPoint(2);
+        ExamPaper paper = paper("paper-1", 0, 0);
+        when(subjectMapper.selectById("subject-1")).thenReturn(subject);
+        when(paperSubjectMapper.selectCount(any())).thenReturn(0L);
+        when(paperMapper.selectById("paper-1")).thenReturn(paper);
+
+        // point 为空 → 回退题目默认分 2
+        service.addSubject("paper-1", "subject-1", null, "chapter-1", null, null);
+
+        ArgumentCaptor<ExamPaperSubject> captor = ArgumentCaptor.forClass(ExamPaperSubject.class);
+        verify(paperSubjectMapper).insert(captor.capture());
+        assertEquals(2, captor.getValue().getPoint());
+        assertEquals(2, paper.getPointnum());
+    }
+
+    @Test
+    void addSubjectFallsBackToSubjectDefaultPointWhenPointIsZero() {
+        ExamSubject subject = subject("subject-1", "version-current");
+        subject.setPoint(3);
+        ExamPaper paper = paper("paper-1", 0, 0);
+        when(subjectMapper.selectById("subject-1")).thenReturn(subject);
+        when(paperSubjectMapper.selectCount(any())).thenReturn(0L);
+        when(paperMapper.selectById("paper-1")).thenReturn(paper);
+
+        // 显式传 0 → 同样回退题目默认分 3
+        service.addSubject("paper-1", "subject-1", null, "chapter-1", null, 0);
+
+        ArgumentCaptor<ExamPaperSubject> captor = ArgumentCaptor.forClass(ExamPaperSubject.class);
+        verify(paperSubjectMapper).insert(captor.capture());
+        assertEquals(3, captor.getValue().getPoint());
+        assertEquals(3, paper.getPointnum());
+    }
+
     private static ExamSubject subject(String id, String versionId) {
         ExamSubject subject = new ExamSubject();
         subject.setId(id);
