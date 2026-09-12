@@ -40,6 +40,13 @@ const POST_LABELS: Record<string, { text: string; color: string }> = {
   platform_admin: { text: '平台管理员', color: 'gold' },
 };
 
+/** 按职位计算默认权限（与后端 PermissionService.defaultPerms 保持一致） */
+const permsForPost = (post: string): string[] => {
+  if (post === 'student' || post === 'platform_admin') return [];
+  const base = ['EXAM_PUBLISH', 'SUBJECT_MANAGE', 'CLASS_IMPORT'];
+  return post === 'director' || post === 'deputy' ? [...base, 'USER_MANAGE'] : base;
+};
+
 const UserPage: React.FC = () => {
   const { message } = App.useApp();
   const { initialState } = useModel('@@initialState');
@@ -129,15 +136,18 @@ const UserPage: React.FC = () => {
   const openEdit = (record?: any) => {
     setEditingUser(record || null);
     if (record) {
+      const recordPost = record.post || resolvePost(record) || 'teacher';
       form.setFieldsValue({
         name: record.name,
         loginname: record.loginname,
-        post: record.post || resolvePost(record),
-        perms: record.perms ? record.perms.split(',').map((p: string) => p.trim()).filter(Boolean) : [],
+        post: recordPost,
+        perms: record.perms
+          ? record.perms.split(',').map((p: string) => p.trim()).filter(Boolean)
+          : permsForPost(recordPost),
         className: record.className,
         comments: record.comments,
       });
-      setSelectedPost(record.post || resolvePost(record) || 'teacher');
+      setSelectedPost(recordPost);
     } else {
       form.setFieldsValue({
         name: undefined,
@@ -419,9 +429,7 @@ const UserPage: React.FC = () => {
               options={POST_OPTIONS}
               onChange={(value) => {
                 setSelectedPost(value);
-                form.setFieldsValue({
-                  perms: value === 'student' || value === 'platform_admin' ? [] : ['EXAM_PUBLISH', 'SUBJECT_MANAGE', 'CLASS_IMPORT'],
-                });
+                form.setFieldsValue({ perms: permsForPost(value) });
               }}
             />
           </Form.Item>
@@ -435,7 +443,7 @@ const UserPage: React.FC = () => {
           <Form.Item name="orgId" label="组织归属" tooltip="选择教研组（主任/副主任选教研室，教师选对应教师分组）">
             <TreeSelect
               treeData={orgTree}
-              treeDefaultExpandAll={false}
+              treeDefaultExpandAll
               allowClear
               placeholder="选择组织节点"
             />
