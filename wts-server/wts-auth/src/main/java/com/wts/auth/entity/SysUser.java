@@ -42,4 +42,8 @@ public class SysUser implements Serializable {
     /** 组织归属节点 id（非表字段，列表返回时填充） */
     @TableField(exist = false)
     private String orgId;
+
+    /** 组织归属节点名称（非表字段，列表返回时填充） */
+    @TableField(exist = false)
+    private String orgName;
 }

@@ -10,4 +10,6 @@ public class SubjectQueryDTO {
     private String typeid;
     private String tiptype;
     private String pstate;
+    /** 组织（教研室）过滤：按题目创建人所属组织子树筛选 */
+    private String orgId;
 }

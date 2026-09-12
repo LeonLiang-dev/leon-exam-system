@@ -1,5 +1,6 @@
 package com.wts.exam.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -26,4 +27,8 @@ public class ExamSubject implements Serializable {
     private String introduction;
     private Integer level;
     private Integer point;
+
+    /** 所属教研室名称（非表字段，列表返回时按创建人组织填充） */
+    @TableField(exist = false)
+    private String orgName;
 }

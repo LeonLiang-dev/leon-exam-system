@@ -22,12 +22,14 @@ class OrganizationServiceTest {
 
     @Mock
     private SysOrganizationMapper organizationMapper;
+    @Mock
+    private com.wts.auth.mapper.SysUserorgMapper userorgMapper;
 
     private OrganizationService service;
 
     @BeforeEach
     void setUp() {
-        service = new OrganizationService(organizationMapper);
+        service = new OrganizationService(organizationMapper, userorgMapper);
     }
 
     @Test

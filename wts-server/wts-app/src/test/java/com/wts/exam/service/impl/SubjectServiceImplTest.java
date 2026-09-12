@@ -1,8 +1,11 @@
 package com.wts.exam.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wts.common.exception.BizException;
+import com.wts.common.result.PageResult;
 import com.wts.exam.dto.AnswerDTO;
 import com.wts.exam.dto.SubjectDTO;
+import com.wts.exam.dto.SubjectQueryDTO;
 import com.wts.exam.entity.ExamSubject;
 import com.wts.exam.entity.ExamSubjectAnswer;
 import com.wts.exam.entity.ExamSubjectVersion;
@@ -38,12 +41,16 @@ class SubjectServiceImplTest {
     private ExamSubjectVersionMapper versionMapper;
     @Mock
     private ExamSubjectAnswerMapper answerMapper;
+    @Mock
+    private com.wts.auth.mapper.SysUserorgMapper userorgMapper;
+    @Mock
+    private com.wts.auth.mapper.SysOrganizationMapper organizationMapper;
 
     private SubjectServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new SubjectServiceImpl(subjectMapper, versionMapper, answerMapper);
+        service = new SubjectServiceImpl(subjectMapper, versionMapper, answerMapper, userorgMapper, organizationMapper);
     }
 
     @Test
@@ -209,6 +216,80 @@ class SubjectServiceImplTest {
         assertEquals(404, error.getCode());
         verify(versionMapper, never()).insert(any(ExamSubjectVersion.class));
         verify(answerMapper, never()).insert(any(ExamSubjectAnswer.class));
+    }
+
+    @Test
+    void listFiltersByOrgSubtreeAndFillsOrgName() {
+        SubjectQueryDTO query = new SubjectQueryDTO();
+        query.setPage(1);
+        query.setSize(10);
+        query.setOrgId("org-1");
+
+        List<ExamSubjectVersion> versions = List.of(subjectVersion("version-1", "s-1", "user-1"));
+        Page<ExamSubject> page = new Page<>(1, 10);
+        page.setRecords(List.of(subject("s-1", "version-1")));
+        page.setTotal(1);
+
+        // usersInOrgSubtree: 组织树 + 组织用户
+        when(organizationMapper.selectList(any())).thenReturn(List.of(
+                org("org-1", "软件教研室", "NONE"),
+                org("org-2", "软件教师一组", "org-1")
+        ));
+        when(userorgMapper.selectList(any())).thenReturn(List.of(userorg("user-1", "org-2")));
+        // applyOwnerScope 反查版本
+        when(versionMapper.selectList(any())).thenReturn(versions);
+        when(subjectMapper.selectPage(any(), any())).thenReturn(page);
+
+        PageResult<ExamSubject> result = service.list(query, null);
+
+        assertEquals(1, result.getRecords().size());
+        // fillOrgNames: 再次查版本 → 组织用户 → 组织名称
+        verify(versionMapper, times(2)).selectList(any());
+        assertEquals("软件教师一组", result.getRecords().get(0).getOrgName());
+    }
+
+    @Test
+    void listWithoutOrgFilterKeepsOwnedScope() {
+        SubjectQueryDTO query = new SubjectQueryDTO();
+        query.setPage(1);
+        query.setSize(10);
+
+        Page<ExamSubject> page = new Page<>(1, 10);
+        page.setRecords(List.of(subject("s-1", "version-1")));
+        page.setTotal(1);
+        when(subjectMapper.selectPage(any(), any())).thenReturn(page);
+
+        PageResult<ExamSubject> result = service.list(query, null);
+        // 无 orgId 时不触碰组织表
+        verify(organizationMapper, never()).selectList(any());
+        verify(subjectMapper).selectPage(any(), any());
+        assertEquals(1, result.getRecords().size());
+        assertEquals(null, result.getRecords().get(0).getOrgName());
+    }
+
+    private static ExamSubjectVersion subjectVersion(String id, String subjectId, String cuser) {
+        ExamSubjectVersion version = new ExamSubjectVersion();
+        version.setId(id);
+        version.setSubjectid(subjectId);
+        version.setCuser(cuser);
+        version.setPstate("1");
+        return version;
+    }
+
+    private static com.wts.auth.entity.SysOrganization org(String id, String name, String parentId) {
+        com.wts.auth.entity.SysOrganization org = new com.wts.auth.entity.SysOrganization();
+        org.setId(id);
+        org.setName(name);
+        org.setParentid(parentId);
+        org.setState("1");
+        return org;
+    }
+
+    private static com.wts.auth.entity.SysUserorg userorg(String userId, String organizationId) {
+        com.wts.auth.entity.SysUserorg userorg = new com.wts.auth.entity.SysUserorg();
+        userorg.setUserid(userId);
+        userorg.setOrganizationid(organizationId);
+        return userorg;
     }
 
     private static SubjectDTO subjectDto() {

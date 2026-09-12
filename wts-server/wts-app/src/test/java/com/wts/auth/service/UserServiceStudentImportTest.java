@@ -35,13 +35,15 @@ class UserServiceStudentImportTest {
     @Mock
     private SysUserorgMapper userorgMapper;
     @Mock
+    private com.wts.auth.mapper.SysOrganizationMapper organizationMapper;
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     private UserService service;
 
     @BeforeEach
     void setUp() {
-        service = new UserService(userMapper, userorgMapper, passwordEncoder);
+        service = new UserService(userMapper, userorgMapper, organizationMapper, passwordEncoder);
     }
 
     @Test

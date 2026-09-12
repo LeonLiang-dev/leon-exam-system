@@ -22,6 +22,7 @@ import {
   importSubjects,
   exportSubjects,
 } from '@/services/exam';
+import { getOrganizationTree } from '@/services/system';
 
 const TIPTYPE_OPTIONS = [
   { value: '1', label: '填空题' },
@@ -112,7 +113,7 @@ const SubjectPage: React.FC = () => {
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<any>(null);
-  const [form] = Form.useForm();
+  const [orgTree, setOrgTree] = useState<any[]>([]);
   const [typeTree, setTypeTree] = useState<any[]>([]);
   const [selectedTiptype, setSelectedTiptype] = useState<string>('2');
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -126,6 +127,18 @@ const SubjectPage: React.FC = () => {
       setTypeTree(res.data || []);
     });
   }, []);
+
+  useEffect(() => {
+    getOrganizationTree().then((res: any) => {
+      setOrgTree((res.data || []).map(normalizeOrgNode));
+    });
+  }, []);
+
+  const normalizeOrgNode = (node: any): any => ({
+    title: node.name,
+    value: node.id,
+    children: node.children ? node.children.map(normalizeOrgNode) : undefined,
+  });
 
   // Convert tree data for TreeSelect
   const buildTreeData = (nodes: any[]): any[] =>
@@ -161,6 +174,21 @@ const SubjectPage: React.FC = () => {
         '2': { text: '中等' },
         '3': { text: '困难' },
       },
+    },
+    {
+      title: '所属教研室',
+      dataIndex: 'orgName',
+      width: 140,
+      hideInSearch: true,
+      render: (_, record) => record.orgName || '-',
+    },
+    {
+      title: '教研室',
+      dataIndex: 'orgId',
+      width: 180,
+      hideInTable: true,
+      valueType: 'treeSelect',
+      fieldProps: { treeData: orgTree, treeDefaultExpandAll: true, allowClear: true, placeholder: '按教研室筛选（含下级）' },
     },
     {
       title: '使用次数',
@@ -442,6 +470,7 @@ const SubjectPage: React.FC = () => {
             size: params.pageSize,
             keyword: params.introduction,
             pstate: params.pstate,
+            orgId: params.orgId,
           });
           return {
             data: res.data?.records || [],

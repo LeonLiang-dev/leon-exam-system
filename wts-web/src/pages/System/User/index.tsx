@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
+import { ProTable, type ActionType, type ProColumns, type ProFormInstance } from '@ant-design/pro-components';
 import { App, Button, Modal, Form, Input, Select, Popconfirm, Space, Upload, TreeSelect, Checkbox, Tag } from 'antd';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UploadOutlined } from '@ant-design/icons';
 import { useModel } from '@umijs/max';
@@ -60,6 +60,7 @@ const UserPage: React.FC = () => {
     : POST_OPTIONS.filter((o) => o.value !== 'platform_admin');
 
   const actionRef = useRef<ActionType>();
+  const proFormRef = useRef<ProFormInstance>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [importing, setImporting] = useState(false);
@@ -76,6 +77,15 @@ const UserPage: React.FC = () => {
       })
       .catch(() => {});
   }, []);
+
+  // 组织页跳转联动：URL 携带 orgId 时自动带该组织筛选
+  useEffect(() => {
+    const orgId = new URLSearchParams(window.location.search).get('orgId');
+    if (orgId) {
+      proFormRef.current?.setFieldValue('orgId', orgId);
+      proFormRef.current?.submit?.();
+    }
+  }, [orgTree]);
 
   const normalizeOrgNode = (node: any): any => ({
     title: node.name,
@@ -171,6 +181,21 @@ const UserPage: React.FC = () => {
   };
 
   const columns: ProColumns[] = [
+    {
+      title: '教研室',
+      dataIndex: 'orgName',
+      width: 150,
+      hideInSearch: true,
+      render: (_, record) => record.orgName || '-',
+    },
+    {
+      title: '组织',
+      dataIndex: 'orgId',
+      width: 180,
+      hideInTable: true,
+      valueType: 'treeSelect',
+      fieldProps: { treeData: orgTree, treeDefaultExpandAll: true, allowClear: true, placeholder: '请选择组织' },
+    },
     {
       title: '姓名',
       dataIndex: 'name',
@@ -387,6 +412,7 @@ const UserPage: React.FC = () => {
             state: params.state,
             post: params.post,
             className: params.className,
+            orgId: params.orgId,
           });
           return {
             data: res.data?.records || [],
@@ -394,6 +420,7 @@ const UserPage: React.FC = () => {
             success: true,
           };
         }}
+        formRef={proFormRef}
         rowSelection={{
           selectedRowKeys,
           onChange: setSelectedRowKeys,

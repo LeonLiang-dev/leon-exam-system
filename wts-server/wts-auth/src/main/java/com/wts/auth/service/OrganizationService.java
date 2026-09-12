@@ -2,7 +2,9 @@ package com.wts.auth.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.wts.auth.entity.SysOrganization;
+import com.wts.auth.entity.SysUserorg;
 import com.wts.auth.mapper.SysOrganizationMapper;
+import com.wts.auth.mapper.SysUserorgMapper;
 import com.wts.common.exception.BizException;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
 public class OrganizationService {
 
     private final SysOrganizationMapper organizationMapper;
+    private final SysUserorgMapper userorgMapper;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String ROOT_PARENT_ID = "NONE";
 
@@ -29,7 +32,7 @@ public class OrganizationService {
     }
 
     /**
-     * 获取组织树（按可见组织节点过滤）。
+     * 获取组织树（按可见组织节点过滤，并填充各节点下用户数）。
      *
      * @param allowedIds 允许的组织节点 id 集合；null 表示全部，空集合表示无
      */
@@ -39,8 +42,11 @@ public class OrganizationService {
                         .eq(SysOrganization::getState, "1")
                         .orderByAsc(SysOrganization::getSort)
         );
+        Map<String, Long> userCountByOrg = userorgMapper.selectList(null).stream()
+                .filter(u -> u.getOrganizationid() != null && !u.getOrganizationid().isBlank())
+                .collect(Collectors.groupingBy(SysUserorg::getOrganizationid, Collectors.counting()));
         if (allowedIds == null) {
-            return buildTree(all, ROOT_PARENT_ID);
+            return buildTree(all, ROOT_PARENT_ID, userCountByOrg);
         }
         if (allowedIds.isEmpty()) {
             return Collections.emptyList();
@@ -73,7 +79,7 @@ public class OrganizationService {
         List<SysOrganization> filtered = all.stream()
                 .filter(o -> keep.contains(o.getId()))
                 .collect(Collectors.toList());
-        return buildTree(filtered, ROOT_PARENT_ID);
+        return buildTree(filtered, ROOT_PARENT_ID, userCountByOrg);
     }
 
     /**
@@ -162,7 +168,8 @@ public class OrganizationService {
         organizationMapper.updateById(org);
     }
 
-    private List<OrgTreeNode> buildTree(List<SysOrganization> all, String parentId) {
+    private List<OrgTreeNode> buildTree(List<SysOrganization> all, String parentId,
+                                        Map<String, Long> userCountByOrg) {
         return all.stream()
                 .filter(org -> parentId.equals(normalizeParentId(org.getParentid())))
                 .map(org -> {
@@ -173,7 +180,8 @@ public class OrganizationService {
                     node.setSort(org.getSort());
                     node.setComments(org.getComments());
                     node.setParentid(normalizeParentId(org.getParentid()));
-                    node.setChildren(buildTree(all, org.getId()));
+                    node.setUserCount(userCountByOrg.getOrDefault(org.getId(), 0L).intValue());
+                    node.setChildren(buildTree(all, org.getId(), userCountByOrg));
                     if (node.getChildren().isEmpty()) {
                         node.setChildren(null);
                     }
@@ -197,6 +205,7 @@ public class OrganizationService {
         private Integer sort;
         private String comments;
         private String parentid;
+        private Integer userCount;
         private List<OrgTreeNode> children;
     }
 }

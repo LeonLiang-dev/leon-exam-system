@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wts.auth.dto.StudentImportResult;
 import com.wts.auth.dto.UserDTO;
+import com.wts.auth.entity.SysOrganization;
 import com.wts.auth.entity.SysUser;
 import com.wts.auth.entity.SysUserorg;
 import com.wts.auth.enums.UserPost;
+import com.wts.auth.mapper.SysOrganizationMapper;
 import com.wts.auth.mapper.SysUserMapper;
 import com.wts.auth.mapper.SysUserorgMapper;
 import com.wts.common.exception.BizException;
@@ -26,8 +28,11 @@ import org.springframework.util.StringUtils;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -39,6 +44,7 @@ public class UserService {
 
     private final SysUserMapper userMapper;
     private final SysUserorgMapper userorgMapper;
+    private final SysOrganizationMapper organizationMapper;
     private final PasswordEncoder passwordEncoder;
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
@@ -54,7 +60,7 @@ public class UserService {
      * @param scopeUserIds 可见用户 id 集合；null 表示不限制（平台管理员）
      */
     public PageResult<SysUser> listUsers(int page, int size, String keyword, String state,
-                                         String post, String className, List<String> scopeUserIds) {
+                                         String post, String className, String orgId, List<String> scopeUserIds) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w
@@ -71,6 +77,24 @@ public class UserService {
         if (StringUtils.hasText(className)) {
             wrapper.like(SysUser::getClassName, className);
         }
+        if (StringUtils.hasText(orgId)) {
+            Set<String> orgScope = expandOrgSubtree(orgId);
+            if (orgScope.isEmpty()) {
+                wrapper.eq(SysUser::getId, "__NONE__");
+            } else {
+                Set<String> orgUserIds = userorgMapper.selectList(
+                                new LambdaQueryWrapper<SysUserorg>()
+                                        .in(SysUserorg::getOrganizationid, orgScope))
+                        .stream()
+                        .map(SysUserorg::getUserid)
+                        .collect(Collectors.toSet());
+                if (orgUserIds.isEmpty()) {
+                    wrapper.eq(SysUser::getId, "__NONE__");
+                } else {
+                    wrapper.in(SysUser::getId, orgUserIds);
+                }
+            }
+        }
         if (scopeUserIds != null) {
             if (scopeUserIds.isEmpty()) {
                 wrapper.eq(SysUser::getId, "__NONE__");
@@ -83,21 +107,57 @@ public class UserService {
         Page<SysUser> result = userMapper.selectPage(new Page<>(page, size), wrapper);
         // 隐藏密码
         result.getRecords().forEach(u -> u.setPassword(null));
-        fillOrgIds(result.getRecords());
+        fillOrgInfo(result.getRecords());
         return PageResult.of(result);
     }
 
-    /** 批量填充用户组织归属（一次 IN 查询） */
-    private void fillOrgIds(List<SysUser> users) {
+    /** 批量填充用户组织归属 id 与名称（一次 IN 查询） */
+    private void fillOrgInfo(List<SysUser> users) {
         if (users == null || users.isEmpty()) {
             return;
         }
         List<String> userIds = users.stream().map(SysUser::getId).distinct().collect(Collectors.toList());
         List<SysUserorg> userOrgs = userorgMapper.selectList(
                 new LambdaQueryWrapper<SysUserorg>().in(SysUserorg::getUserid, userIds));
-        java.util.Map<String, String> orgByUser = userOrgs.stream()
+        Map<String, String> orgByUser = userOrgs.stream()
                 .collect(Collectors.toMap(SysUserorg::getUserid, SysUserorg::getOrganizationid, (a, b) -> a));
-        users.forEach(u -> u.setOrgId(orgByUser.get(u.getId())));
+        if (orgByUser.isEmpty()) {
+            return;
+        }
+        Map<String, String> nameByOrg = organizationMapper.selectList(
+                        new LambdaQueryWrapper<SysOrganization>()
+                                .in(SysOrganization::getId, new HashSet<>(orgByUser.values())))
+                .stream()
+                .collect(Collectors.toMap(SysOrganization::getId, SysOrganization::getName, (a, b) -> a));
+        users.forEach(u -> {
+            String orgId = orgByUser.get(u.getId());
+            u.setOrgId(orgId);
+            u.setOrgName(orgId != null ? nameByOrg.get(orgId) : null);
+        });
+    }
+
+    /** 展开组织节点及其全部子孙节点 id 集合 */
+    private Set<String> expandOrgSubtree(String orgId) {
+        Set<String> result = new HashSet<>();
+        List<SysOrganization> all = organizationMapper.selectList(null);
+        if (all.isEmpty()) {
+            return result;
+        }
+        Map<String, List<SysOrganization>> childrenByParent = new HashMap<>();
+        for (SysOrganization org : all) {
+            childrenByParent.computeIfAbsent(org.getParentid(), k -> new ArrayList<>()).add(org);
+        }
+        collectSubtree(orgId, childrenByParent, result);
+        return result;
+    }
+
+    private void collectSubtree(String nodeId, Map<String, List<SysOrganization>> childrenByParent, Set<String> out) {
+        if (nodeId == null || !out.add(nodeId)) {
+            return;
+        }
+        for (SysOrganization child : childrenByParent.getOrDefault(nodeId, List.of())) {
+            collectSubtree(child.getId(), childrenByParent, out);
+        }
     }
 
     /**

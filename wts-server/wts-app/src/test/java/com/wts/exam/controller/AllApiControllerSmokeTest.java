@@ -149,13 +149,13 @@ class AllApiControllerSmokeTest {
         MockMultipartFile file = new MockMultipartFile("file", "students.xlsx", "application/vnd.ms-excel", "content".getBytes());
         com.wts.auth.dto.BatchIdsDTO batchIds = authBatchIds("user-1", "user-2");
 
-        when(userService.listUsers(1, 20, "kw", "1", null, null, null)).thenReturn(PageResult.of(List.of(sysUser("user-1")), 1, 1, 20));
+        when(userService.listUsers(1, 20, "kw", "1", null, null, null, null)).thenReturn(PageResult.of(List.of(sysUser("user-1")), 1, 1, 20));
         when(permissionService.visibleUserIds(any())).thenReturn(null);
         when(userService.createUser(any(UserDTO.class), eq("admin-1"))).thenReturn(sysUser("user-1"));
         when(userService.importStudents(any(InputStream.class), eq("admin-1"))).thenReturn(new StudentImportResult());
         when(userService.updateUser(eq("user-1"), any(UserDTO.class), eq("admin-1"))).thenReturn(sysUser("user-1"));
 
-        assertOk(controller.list(1, 20, "kw", "1", null, null));
+        assertOk(controller.list(1, 20, "kw", "1", null, null, null));
         assertOk(controller.create(new UserDTO()));
         assertOk(controller.importStudents(file));
         assertOk(controller.update("user-1", new UserDTO()));

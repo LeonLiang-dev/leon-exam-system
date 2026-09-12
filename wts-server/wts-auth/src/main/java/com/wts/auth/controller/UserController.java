@@ -37,11 +37,12 @@ public class UserController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String post,
-            @RequestParam(required = false) String className) {
+            @RequestParam(required = false) String className,
+            @RequestParam(required = false) String orgId) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.USER_MANAGE.name());
         PageResult<SysUser> result = userService.listUsers(
-                page, size, keyword, state, post, className, permissionService.visibleUserIds(user));
+                page, size, keyword, state, post, className, orgId, permissionService.visibleUserIds(user));
         return R.ok(result);
     }
 

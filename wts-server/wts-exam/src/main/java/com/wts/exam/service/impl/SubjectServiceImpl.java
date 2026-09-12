@@ -2,6 +2,10 @@ package com.wts.exam.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.wts.auth.entity.SysOrganization;
+import com.wts.auth.entity.SysUserorg;
+import com.wts.auth.mapper.SysOrganizationMapper;
+import com.wts.auth.mapper.SysUserorgMapper;
 import com.wts.common.exception.BizException;
 import com.wts.common.result.PageResult;
 import com.wts.exam.dto.AnswerDTO;
@@ -21,8 +25,14 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +41,8 @@ public class SubjectServiceImpl implements SubjectService {
     private final ExamSubjectMapper subjectMapper;
     private final ExamSubjectVersionMapper versionMapper;
     private final ExamSubjectAnswerMapper answerMapper;
+    private final SysUserorgMapper userorgMapper;
+    private final SysOrganizationMapper organizationMapper;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     @Override
@@ -50,18 +62,22 @@ public class SubjectServiceImpl implements SubjectService {
         if (StringUtils.hasText(query.getPstate())) {
             wrapper.eq(ExamSubject::getPstate, query.getPstate());
         }
-        applyOwnerScope(wrapper, ownerIds);
+        if (StringUtils.hasText(query.getOrgId())) {
+            Set<String> orgUserIds = usersInOrgSubtree(query.getOrgId());
+            applyOwnerScope(wrapper, mergeScopes(ownerIds, orgUserIds));
+        } else {
+            applyOwnerScope(wrapper, ownerIds);
+        }
         // Filter by tiptype via version subquery is complex; for now filter by typeid
         wrapper.orderByDesc(ExamSubject::getUuid);
 
         Page<ExamSubject> page = subjectMapper.selectPage(
                 new Page<>(query.getPage(), query.getSize()), wrapper);
+        fillOrgNames(page.getRecords());
         return PageResult.of(page);
     }
 
-    /**
-     * 创建人范围过滤：题目主表无创建人字段，通过其当前版本(version.cuser)反查。
-     */
+    /** 创建人范围过滤：题目主表无创建人字段，通过其当前版本(version.cuser)反查。 */
     private void applyOwnerScope(LambdaQueryWrapper<ExamSubject> wrapper, List<String> ownerIds) {
         if (ownerIds == null) {
             return;
@@ -79,6 +95,87 @@ public class SubjectServiceImpl implements SubjectService {
         } else {
             wrapper.in(ExamSubject::getVersionid, versionIds);
         }
+    }
+
+    /** 组织范围与可见范围的交集：orgUserIds 为空时保持原范围 */
+    private List<String> mergeScopes(List<String> visibleOwnerIds, Set<String> orgUserIds) {
+        if (visibleOwnerIds == null) {
+            return new ArrayList<>(orgUserIds);
+        }
+        return visibleOwnerIds.stream().filter(orgUserIds::contains).collect(Collectors.toList());
+    }
+
+    /** 展开组织节点及其全部子孙节点 → 归属用户 id 集合 */
+    private Set<String> usersInOrgSubtree(String orgId) {
+        Set<String> result = new HashSet<>();
+        List<SysOrganization> all = organizationMapper.selectList(null);
+        if (all.isEmpty()) {
+            return result;
+        }
+        Map<String, List<SysOrganization>> childrenByParent = new HashMap<>();
+        for (SysOrganization org : all) {
+            childrenByParent.computeIfAbsent(org.getParentid(), k -> new ArrayList<>()).add(org);
+        }
+        collectSubtree(orgId, childrenByParent, result);
+        if (result.isEmpty()) {
+            return result;
+        }
+        return userorgMapper.selectList(
+                        new LambdaQueryWrapper<SysUserorg>()
+                                .in(SysUserorg::getOrganizationid, result))
+                .stream()
+                .map(SysUserorg::getUserid)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+    }
+
+    private void collectSubtree(String nodeId, Map<String, List<SysOrganization>> childrenByParent, Set<String> out) {
+        if (nodeId == null || !out.add(nodeId)) {
+            return;
+        }
+        for (SysOrganization child : childrenByParent.getOrDefault(nodeId, List.of())) {
+            collectSubtree(child.getId(), childrenByParent, out);
+        }
+    }
+
+    /** 批量填充题目所属教研室名称（按当前版本创建人 → 组织归属） */
+    private void fillOrgNames(List<ExamSubject> subjects) {
+        if (subjects == null || subjects.isEmpty()) {
+            return;
+        }
+        List<String> versionIds = subjects.stream()
+                .map(ExamSubject::getVersionid)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        if (versionIds.isEmpty()) {
+            return;
+        }
+        Map<String, String> versionToUser = versionMapper.selectList(
+                        new LambdaQueryWrapper<ExamSubjectVersion>()
+                                .in(ExamSubjectVersion::getId, versionIds))
+                .stream()
+                .collect(Collectors.toMap(ExamSubjectVersion::getId,
+                        v -> StringUtils.hasText(v.getCuser()) ? v.getCuser() : "",
+                        (a, b) -> a));
+        Map<String, String> orgByUser = userorgMapper.selectList(
+                        new LambdaQueryWrapper<SysUserorg>()
+                                .in(SysUserorg::getUserid, new HashSet<>(versionToUser.values())))
+                .stream()
+                .collect(Collectors.toMap(SysUserorg::getUserid, SysUserorg::getOrganizationid, (a, b) -> a));
+        if (orgByUser.isEmpty()) {
+            return;
+        }
+        Map<String, String> nameByOrg = organizationMapper.selectList(
+                        new LambdaQueryWrapper<SysOrganization>()
+                                .in(SysOrganization::getId, new HashSet<>(orgByUser.values())))
+                .stream()
+                .collect(Collectors.toMap(SysOrganization::getId, SysOrganization::getName, (a, b) -> a));
+        subjects.forEach(s -> {
+            String userId = versionToUser.getOrDefault(s.getVersionid(), "");
+            String orgId = userId != null ? orgByUser.get(userId) : null;
+            s.setOrgName(orgId != null ? nameByOrg.get(orgId) : null);
+        });
     }
 
     @Override

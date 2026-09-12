@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { App, Card, Tree, Button, Modal, Form, Input, InputNumber, Select, Space, Spin, Popconfirm } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { App, Card, Tree, Button, Modal, Form, Input, InputNumber, Select, Space, Spin, Popconfirm, Tag } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
+import { history } from '@umijs/max';
 import {
   getOrganizationTree,
   createOrganization,
@@ -13,6 +14,7 @@ interface OrgNode {
   name: string;
   type?: string;
   sort?: number;
+  userCount?: number;
   children?: OrgNode[];
 }
 
@@ -42,7 +44,16 @@ const OrganizationPage: React.FC = () => {
   const convertToTreeData = (nodes: OrgNode[]): any[] =>
     nodes.map((node) => ({
       key: node.id,
-      title: node.name,
+      title: (
+        <span>
+          {node.name}
+          {Number(node.userCount ?? 0) > 0 && (
+            <Tag style={{ marginLeft: 6 }} color="purple">
+              {node.userCount}人
+            </Tag>
+          )}
+        </span>
+      ),
       data: node,
       children: node.children ? convertToTreeData(node.children) : [],
     }));
@@ -146,7 +157,20 @@ const OrganizationPage: React.FC = () => {
               <strong>排序：</strong>
               {selectedNode.sort ?? '-'}
             </p>
+            <p>
+              <strong>用户数：</strong>
+              {Number(selectedNode.userCount ?? 0) > 0 ? `${selectedNode.userCount} 人` : '0 人'}
+            </p>
             <Space style={{ marginTop: 16 }}>
+              <Button
+                type="primary"
+                icon={<UserOutlined />}
+                onClick={() => {
+                  history.push(`/system/user?orgId=${selectedNode.id}`);
+                }}
+              >
+                查看用户
+              </Button>
               <Button
                 icon={<PlusOutlined />}
                 onClick={() => handleAdd(selectedNode.id)}
