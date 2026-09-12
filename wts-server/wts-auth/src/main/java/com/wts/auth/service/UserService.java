@@ -83,7 +83,21 @@ public class UserService {
         Page<SysUser> result = userMapper.selectPage(new Page<>(page, size), wrapper);
         // 隐藏密码
         result.getRecords().forEach(u -> u.setPassword(null));
+        fillOrgIds(result.getRecords());
         return PageResult.of(result);
+    }
+
+    /** 批量填充用户组织归属（一次 IN 查询） */
+    private void fillOrgIds(List<SysUser> users) {
+        if (users == null || users.isEmpty()) {
+            return;
+        }
+        List<String> userIds = users.stream().map(SysUser::getId).distinct().collect(Collectors.toList());
+        List<SysUserorg> userOrgs = userorgMapper.selectList(
+                new LambdaQueryWrapper<SysUserorg>().in(SysUserorg::getUserid, userIds));
+        java.util.Map<String, String> orgByUser = userOrgs.stream()
+                .collect(Collectors.toMap(SysUserorg::getUserid, SysUserorg::getOrganizationid, (a, b) -> a));
+        users.forEach(u -> u.setOrgId(orgByUser.get(u.getId())));
     }
 
     /**

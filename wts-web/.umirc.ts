@@ -101,7 +101,7 @@ export default defineConfig({
       name: '系统管理',
       path: '/system',
       icon: 'SettingOutlined',
-      access: 'isStaff',
+      access: 'canManage',
       routes: [
         {
           name: '用户管理',

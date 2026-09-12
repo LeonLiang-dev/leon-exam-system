@@ -38,4 +38,8 @@ public class SysUser implements Serializable {
 
     @TableField(exist = false)
     private String ip;
+
+    /** 组织归属节点 id（非表字段，列表返回时填充） */
+    @TableField(exist = false)
+    private String orgId;
 }

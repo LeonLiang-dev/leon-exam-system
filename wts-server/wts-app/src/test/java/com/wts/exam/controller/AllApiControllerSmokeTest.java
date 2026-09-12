@@ -172,10 +172,11 @@ class AllApiControllerSmokeTest {
 
     @Test
     void organizationEndpointsAreCallable() {
-        OrganizationController controller = new OrganizationController(organizationService);
+        OrganizationController controller = new OrganizationController(organizationService, permissionService, currentUserProvider);
         LoginUserDetails loginUser = loginUser("admin-1", "admin", "Admin One", "1");
 
-        when(organizationService.getOrgTree()).thenReturn(List.of());
+        when(permissionService.visibleOrgIds(any())).thenReturn(null);
+        when(organizationService.getOrgTree(any())).thenReturn(List.of());
         when(organizationService.createOrganization(any(SysOrganization.class), eq("admin-1"))).thenReturn(new SysOrganization());
         when(organizationService.updateOrganization(eq("org-1"), any(SysOrganization.class), eq("admin-1"))).thenReturn(new SysOrganization());
 

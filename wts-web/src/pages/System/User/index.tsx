@@ -54,6 +54,11 @@ const UserPage: React.FC = () => {
   const isPlatformAdmin =
     currentUser?.post === 'platform_admin' || (currentUser?.type === '3' && !currentUser?.post);
 
+  // 职位可选范围：平台管理员全量；主任/副主任可选 学生/教师/主任/副主任（不能建平台管理员）
+  const postOptions = isPlatformAdmin
+    ? POST_OPTIONS
+    : POST_OPTIONS.filter((o) => o.value !== 'platform_admin');
+
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -144,21 +149,23 @@ const UserPage: React.FC = () => {
         perms: record.perms
           ? record.perms.split(',').map((p: string) => p.trim()).filter(Boolean)
           : permsForPost(recordPost),
+        orgId: record.orgId,
         className: record.className,
         comments: record.comments,
       });
       setSelectedPost(recordPost);
     } else {
+      const defaultPost = isPlatformAdmin ? 'teacher' : 'student';
       form.setFieldsValue({
         name: undefined,
         loginname: undefined,
-        post: 'teacher',
-        perms: ['EXAM_PUBLISH', 'SUBJECT_MANAGE', 'CLASS_IMPORT'],
+        post: defaultPost,
+        perms: permsForPost(defaultPost),
         className: undefined,
         orgId: undefined,
         comments: undefined,
       });
-      setSelectedPost('teacher');
+      setSelectedPost(defaultPost);
     }
     setModalOpen(true);
   };
@@ -422,11 +429,10 @@ const UserPage: React.FC = () => {
           <Form.Item
             name="post"
             label="职位"
-            tooltip={isPlatformAdmin ? '调整职位会同时按职位重算默认权限' : '仅平台管理员可调整职位'}
+            tooltip={isPlatformAdmin ? '调整职位会同时按职位重算默认权限' : '仅可创建/调整本教研室范围内的职位（学生/教师/主任/副主任）'}
           >
             <Select
-              disabled={!isPlatformAdmin}
-              options={POST_OPTIONS}
+              options={postOptions}
               onChange={(value) => {
                 setSelectedPost(value);
                 form.setFieldsValue({ perms: permsForPost(value) });

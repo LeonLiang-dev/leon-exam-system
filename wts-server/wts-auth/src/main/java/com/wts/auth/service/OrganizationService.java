@@ -25,12 +25,55 @@ public class OrganizationService {
      * 获取组织树
      */
     public List<OrgTreeNode> getOrgTree() {
+        return getOrgTree(null);
+    }
+
+    /**
+     * 获取组织树（按可见组织节点过滤）。
+     *
+     * @param allowedIds 允许的组织节点 id 集合；null 表示全部，空集合表示无
+     */
+    public List<OrgTreeNode> getOrgTree(List<String> allowedIds) {
         List<SysOrganization> all = organizationMapper.selectList(
                 new LambdaQueryWrapper<SysOrganization>()
                         .eq(SysOrganization::getState, "1")
                         .orderByAsc(SysOrganization::getSort)
         );
-        return buildTree(all, ROOT_PARENT_ID);
+        if (allowedIds == null) {
+            return buildTree(all, ROOT_PARENT_ID);
+        }
+        if (allowedIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<String> allowed = new HashSet<>(allowedIds);
+        Map<String, SysOrganization> byId = all.stream()
+                .collect(Collectors.toMap(SysOrganization::getId, o -> o, (a, b) -> a));
+        // 保留允许节点及其完整祖先链（根 → 教研室 → 教师分组），确保能构建出完整子树
+        Set<String> keep = new HashSet<>();
+        for (SysOrganization org : all) {
+            if (!allowed.contains(org.getId())) {
+                continue;
+            }
+            String current = org.getId();
+            while (current != null) {
+                keep.add(current);
+                SysOrganization node = byId.get(current);
+                if (node == null) {
+                    break;
+                }
+                String parentId = node.getParentid();
+                if (!ROOT_PARENT_ID.equals(parentId) && parentId != null && !parentId.isBlank()) {
+                    current = parentId;
+                } else {
+                    break;
+                }
+            }
+        }
+        List<SysOrganization> filtered = all.stream()
+                .filter(o -> keep.contains(o.getId()))
+                .collect(Collectors.toList());
+        return buildTree(filtered, ROOT_PARENT_ID);
     }
 
     /**
