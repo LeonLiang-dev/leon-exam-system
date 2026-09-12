@@ -145,7 +145,7 @@ class RoomServiceImplParticipationTest {
 
     @Test
     void deleteRemovesRoomCardsAndCardChildren() {
-        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "31", "1"));
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "11", "1"));
         when(cardMapper.selectList(any())).thenReturn(List.of(
                 card("card-1", "room-1", "user-1", "16"),
                 card("card-2", "room-1", "user-2", "21")
@@ -289,6 +289,20 @@ class RoomServiceImplParticipationTest {
         verify(roomPaperMapper).delete(any());
         verify(roomUserMapper).delete(any());
         verify(roomMapper).deleteById("room-1");
+    }
+
+    @Test
+    void deleteRejectsClosedRoomWithSubmittedCards() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "31", "1"));
+        when(cardMapper.selectCount(any())).thenReturn(3L);
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.delete("room-1", "teacher-1"));
+
+        assertEquals("该答题室已有答卷记录，为保留成绩数据请勿删除", error.getMessage());
+        verify(cardMapper, never()).selectList(any());
+        verify(cardAnswerMapper, never()).delete(any());
+        verify(roomMapper, never()).deleteById("room-1");
     }
 
     @Test

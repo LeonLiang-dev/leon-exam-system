@@ -60,4 +60,8 @@ public class ExamRoom implements Serializable {
 
     @TableField(exist = false)
     private String resultUnavailableReason;
+
+    /** 该答题室已产生的答卷总数（非持久化，列表查询时汇总填充） */
+    @TableField(exist = false)
+    private Integer cardCount;
 }

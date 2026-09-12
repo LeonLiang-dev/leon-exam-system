@@ -62,7 +62,9 @@ public class RoomServiceImpl implements RoomService {
             wrapper.in(ExamRoom::getCuser, ownerIds);
         }
         wrapper.orderByDesc(ExamRoom::getCtime);
-        return PageResult.of(roomMapper.selectPage(new Page<>(page, size), wrapper));
+        Page<ExamRoom> pageResult = roomMapper.selectPage(new Page<>(page, size), wrapper);
+        attachRoomCardCounts(pageResult.getRecords());
+        return PageResult.of(pageResult);
     }
 
     @Override
@@ -199,6 +201,11 @@ public class RoomServiceImpl implements RoomService {
         ExamRoom room = roomMapper.selectById(id);
         if (room != null && ROOM_PUBLISHED.equals(room.getPstate())) {
             throw BizException.fail("已发布答题室请先关闭后再删除");
+        }
+        if (room != null && ROOM_CLOSED.equals(room.getPstate())
+                && cardMapper.selectCount(new LambdaQueryWrapper<ExamCard>()
+                        .eq(ExamCard::getRoomid, id)) > 0) {
+            throw BizException.fail("该答题室已有答卷记录，为保留成绩数据请勿删除");
         }
         deleteRoomCards(id);
         roomPaperMapper.delete(new LambdaQueryWrapper<ExamRoomPaper>().eq(ExamRoomPaper::getRoomid, id));
@@ -412,6 +419,31 @@ public class RoomServiceImpl implements RoomService {
     private void requireDraftRoom(ExamRoom room, String actionName) {
         if (!ROOM_DRAFT.equals(room.getPstate())) {
             throw BizException.fail("只有草稿状态的答题室允许" + actionName);
+        }
+    }
+
+    /** 批量汇总答题室答卷数（单次查询，避免 N+1） */
+    private void attachRoomCardCounts(List<ExamRoom> rooms) {
+        if (rooms == null || rooms.isEmpty()) {
+            return;
+        }
+        List<String> roomIds = rooms.stream()
+                .map(ExamRoom::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+        if (roomIds.isEmpty()) {
+            return;
+        }
+        Map<String, Long> countByRoom = cardMapper.selectList(
+                        new LambdaQueryWrapper<ExamCard>()
+                                .in(ExamCard::getRoomid, roomIds)
+                                .select(ExamCard::getRoomid))
+                .stream()
+                .collect(Collectors.groupingBy(ExamCard::getRoomid, Collectors.counting()));
+        for (ExamRoom room : rooms) {
+            Long count = countByRoom.get(room.getId());
+            room.setCardCount(count == null ? 0 : count.intValue());
         }
     }
 

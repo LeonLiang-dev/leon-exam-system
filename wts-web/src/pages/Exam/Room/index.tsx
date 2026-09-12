@@ -112,6 +112,13 @@ const RoomPage: React.FC = () => {
       message.warning('已发布答题室请先关闭后再删除');
       return null;
     }
+    const closedWithCardsRows = selectedRows.filter(
+      (room) => room.pstate === '31' && Number(room.cardCount ?? 0) > 0,
+    );
+    if (closedWithCardsRows.length > 0) {
+      message.warning('已关闭且有答卷记录的答题室删除将丢失成绩数据，请保留');
+      return null;
+    }
     return selectedRows.map((room) => room.id);
   };
 
@@ -354,6 +361,10 @@ const RoomPage: React.FC = () => {
             <Popconfirm
               title="确定删除此答题室？"
               onConfirm={async () => {
+                if (record.pstate === '31' && Number(record.cardCount ?? 0) > 0) {
+                  message.warning('该答题室已有答卷记录，为保留成绩数据请勿删除');
+                  return;
+                }
                 try {
                   await deleteRoom(record.id);
                   message.success('已删除');
