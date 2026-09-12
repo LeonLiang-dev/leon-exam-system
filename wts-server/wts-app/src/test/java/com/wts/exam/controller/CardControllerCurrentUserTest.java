@@ -1,10 +1,14 @@
 package com.wts.exam.controller;
 
+import com.wts.auth.service.PermissionService;
 import com.wts.common.security.CurrentUserProvider;
 import com.wts.common.security.LoginUserDetails;
 import com.wts.exam.dto.CardSubmitDTO;
 import com.wts.exam.dto.JudgeDTO;
 import com.wts.exam.entity.ExamCard;
+import com.wts.exam.entity.ExamRoom;
+import com.wts.exam.mapper.ExamCardMapper;
+import com.wts.exam.mapper.ExamRoomMapper;
 import com.wts.exam.service.CardService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
@@ -29,12 +34,18 @@ class CardControllerCurrentUserTest {
 
     @Mock
     private CardService service;
+    @Mock
+    private PermissionService permissionService;
+    @Mock
+    private ExamCardMapper cardMapper;
+    @Mock
+    private ExamRoomMapper roomMapper;
 
     private CardController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new CardController(service, new CurrentUserProvider());
+        controller = new CardController(service, new CurrentUserProvider(), permissionService, cardMapper, roomMapper);
 
         LoginUserDetails details = new LoginUserDetails();
         details.setUserId("user-1");
@@ -82,8 +93,10 @@ class CardControllerCurrentUserTest {
     }
 
     @Test
-    void judgeUsesAuthenticatedUser() {
+    void judgeUsesAuthenticatedUserForOwnedCard() {
         JudgeDTO dto = new JudgeDTO();
+        mockOwnedCard("card-1", "user-1");
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
 
         controller.judge("card-1", dto);
 
@@ -91,9 +104,22 @@ class CardControllerCurrentUserTest {
     }
 
     @Test
-    void studentCannotJudgeCard() {
-        authenticate("student-1", "student", "Student One", "2");
+    void cannotJudgeWithoutPublishPermission() {
+        doThrow(com.wts.common.exception.BizException.forbidden("无权操作"))
+                .when(permissionService).require(any(), any());
         JudgeDTO dto = new JudgeDTO();
+
+        var error = assertThrows(com.wts.common.exception.BizException.class, () -> controller.judge("card-1", dto));
+
+        assertEquals(403, error.getCode());
+        verify(service, never()).judge(any(), any(), any(), any());
+    }
+
+    @Test
+    void cannotJudgeCardOutsideVisibleScope() {
+        JudgeDTO dto = new JudgeDTO();
+        mockOwnedCard("card-1", "teacher-9");
+        when(permissionService.visibleOwnerIds(any())).thenReturn(List.of("teacher-1"));
 
         var error = assertThrows(com.wts.common.exception.BizException.class, () -> controller.judge("card-1", dto));
 
@@ -160,5 +186,16 @@ class CardControllerCurrentUserTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(details, null, List.of())
         );
+    }
+
+    private void mockOwnedCard(String cardId, String ownerId) {
+        ExamCard card = new ExamCard();
+        card.setId(cardId);
+        card.setRoomid("room-1");
+        ExamRoom room = new ExamRoom();
+        room.setId("room-1");
+        room.setCuser(ownerId);
+        when(cardMapper.selectById(cardId)).thenReturn(card);
+        when(roomMapper.selectById("room-1")).thenReturn(room);
     }
 }

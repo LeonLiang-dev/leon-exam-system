@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ExamBatchControllerTest {
@@ -48,6 +49,10 @@ class ExamBatchControllerTest {
     private CardService cardService;
     @Mock
     private PermissionService permissionService;
+    @Mock
+    private com.wts.exam.mapper.ExamCardMapper cardMapper;
+    @Mock
+    private com.wts.exam.mapper.ExamRoomMapper roomMapper;
 
     private final CurrentUserProvider currentUserProvider = new CurrentUserProvider();
 
@@ -117,7 +122,18 @@ class ExamBatchControllerTest {
 
     @Test
     void cardBatchJudgeDelegatesNormalizedIds() {
-        CardController controller = new CardController(cardService, currentUserProvider);
+        CardController controller = new CardController(cardService, currentUserProvider, permissionService, cardMapper, roomMapper);
+
+        com.wts.exam.entity.ExamCard card = new com.wts.exam.entity.ExamCard();
+        card.setId("card-1");
+        card.setRoomid("room-1");
+        com.wts.exam.entity.ExamRoom room = new com.wts.exam.entity.ExamRoom();
+        room.setId("room-1");
+        room.setCuser("admin-1");
+        when(cardMapper.selectById("card-1")).thenReturn(card);
+        when(cardMapper.selectById("card-2")).thenReturn(card);
+        when(roomMapper.selectById("room-1")).thenReturn(room);
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
 
         controller.batchJudge(batchIds(" card-1 ", "card-2", "card-1"));
 

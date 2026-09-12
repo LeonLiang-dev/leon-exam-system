@@ -281,7 +281,7 @@ class AllApiControllerSmokeTest {
 
     @Test
     void cardEndpointsAreCallable() {
-        CardController controller = new CardController(cardService, currentUserProvider);
+        CardController controller = new CardController(cardService, currentUserProvider, permissionService, cardMapper, roomMapper);
 
         when(cardService.enterRoom("room-1", "admin-1", "Admin One", true)).thenReturn(new ExamCard());
         when(cardService.getResult("card-1", "admin-1", true)).thenReturn(new ExamCard());
@@ -291,6 +291,17 @@ class AllApiControllerSmokeTest {
         when(cardService.getExamPaper("card-1", "admin-1")).thenReturn(new ExamPaperVO());
         when(cardService.getExamPaperForReview("card-1")).thenReturn(new ExamPaperVO());
         when(cardService.getRoomCards("room-1", 1, 20)).thenReturn(PageResult.of(List.of(new ExamCard()), 1, 1, 20));
+
+        ExamCard card = new ExamCard();
+        card.setId("card-1");
+        card.setRoomid("room-1");
+        ExamRoom room = new ExamRoom();
+        room.setId("room-1");
+        room.setCuser("admin-1");
+        when(cardMapper.selectById("card-1")).thenReturn(card);
+        when(cardMapper.selectById("card-2")).thenReturn(card);
+        when(roomMapper.selectById("room-1")).thenReturn(room);
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
 
         assertOk(controller.enterRoom("room-1"));
         assertOk(controller.detail("card-1"));

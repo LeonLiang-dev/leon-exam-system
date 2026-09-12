@@ -1,5 +1,7 @@
 package com.wts.exam.controller;
 
+import com.wts.auth.enums.Permission;
+import com.wts.auth.service.PermissionService;
 import com.wts.common.exception.BizException;
 import com.wts.common.result.R;
 import com.wts.common.security.CurrentUser;
@@ -8,6 +10,9 @@ import com.wts.exam.dto.BatchIdsDTO;
 import com.wts.exam.dto.CardSubmitDTO;
 import com.wts.exam.dto.JudgeDTO;
 import com.wts.exam.entity.ExamCard;
+import com.wts.exam.entity.ExamRoom;
+import com.wts.exam.mapper.ExamCardMapper;
+import com.wts.exam.mapper.ExamRoomMapper;
 import com.wts.exam.service.CardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +24,9 @@ import java.util.*;
 public class CardController {
     private final CardService service;
     private final CurrentUserProvider currentUserProvider;
+    private final PermissionService permissionService;
+    private final ExamCardMapper cardMapper;
+    private final ExamRoomMapper roomMapper;
 
     @PostMapping("/enter")
     public R<?> enterRoom(@RequestParam String roomId) {
@@ -58,7 +66,8 @@ public class CardController {
     public R<?> judge(@PathVariable String id,
                       @RequestBody(required = false) JudgeDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
+        requireOwnsCard(user, id);
         service.judge(id, dto, user.id(), user.displayName());
         return R.ok();
     }
@@ -66,9 +75,12 @@ public class CardController {
     @PostMapping("/batch-judge")
     public R<?> batchJudge(@RequestBody BatchIdsDTO dto) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
-        service.judgeBatch(dto.normalizedIds(), user.id(), user.displayName());
-        return R.ok();
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
+        List<String> ids = dto.normalizedIds();
+        for (String cardId : ids) {
+            requireOwnsCard(user, cardId);
+        }
+        return R.ok(service.judgeBatch(ids, user.id(), user.displayName()));
     }
 
     @GetMapping("/{id}/paper")
@@ -80,7 +92,8 @@ public class CardController {
     @GetMapping("/{id}/paper-review")
     public R<?> getExamPaperForReview(@PathVariable String id) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
+        requireOwnsCard(user, id);
         return R.ok(service.getExamPaperForReview(id));
     }
 
@@ -89,13 +102,41 @@ public class CardController {
                              @RequestParam(defaultValue = "1") int page,
                              @RequestParam(defaultValue = "20") int size) {
         CurrentUser user = currentUserProvider.require();
-        requireAdmin(user);
+        permissionService.require(user, Permission.EXAM_PUBLISH.name());
+        requireOwnsRoom(user, roomId);
         return R.ok(service.getRoomCards(roomId, page, size));
     }
 
-    private void requireAdmin(CurrentUser user) {
-        if (!user.isAdmin()) {
-            throw BizException.forbidden("无权操作");
+    private void requireOwnsCard(CurrentUser user, String cardId) {
+        ExamCard card = cardMapper.selectById(cardId);
+        if (card == null) {
+            throw BizException.notFound("答卷");
+        }
+        ExamRoom room = roomMapper.selectById(card.getRoomid());
+        if (room == null) {
+            throw BizException.notFound("答题室");
+        }
+        requireOwns(user, room.getCuser());
+    }
+
+    private void requireOwnsRoom(CurrentUser user, String roomId) {
+        ExamRoom room = roomMapper.selectById(roomId);
+        if (room == null) {
+            throw BizException.notFound("答题室");
+        }
+        requireOwns(user, room.getCuser());
+    }
+
+    private void requireOwns(CurrentUser user, String ownerId) {
+        if (user.isPlatformAdmin()) {
+            return;
+        }
+        List<String> scope = permissionService.visibleOwnerIds(user);
+        if (scope == null) {
+            return;
+        }
+        if (ownerId == null || !scope.contains(ownerId)) {
+            throw BizException.forbidden("只能操作自己创建的答题室答卷");
         }
     }
 }

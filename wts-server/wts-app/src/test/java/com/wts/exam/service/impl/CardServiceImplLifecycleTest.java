@@ -37,6 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -534,6 +535,46 @@ class CardServiceImplLifecycleTest {
 
         assertEquals("评分不能超出题目分值", error.getMessage());
         verify(cardPointMapper, never()).updateById(any(ExamCardPoint.class));
+        verify(cardMapper, never()).updateById(any(ExamCard.class));
+    }
+
+    @Test
+    void judgeBatchSkipsCardsThatStillNeedManualReview() {
+        ExamCard autoCard = card("card-1", "paper-1", "room-1", "user-1", "16");
+        ExamCard manualCard = card("card-2", "paper-1", "room-1", "user-1", "16");
+        ExamCardPoint donePoint = cardPoint("card-1", "version-1", 5);
+        donePoint.setReviewRequired("0");
+        ExamCardPoint pendingPoint = cardPoint("card-2", "version-1", 0);
+        pendingPoint.setMpoint(10);
+        pendingPoint.setReviewRequired("1");
+        when(cardMapper.selectById("card-1")).thenReturn(autoCard);
+        when(cardMapper.selectById("card-2")).thenReturn(manualCard);
+        when(cardPointMapper.selectList(any()))
+                .thenReturn(List.of(donePoint))
+                .thenReturn(List.of(pendingPoint));
+
+        Map<String, Object> result = service.judgeBatch(List.of("card-1", "card-2"), "teacher-1", "Teacher One");
+
+        assertEquals(Map.of("judged", 1, "skipped", 1), result);
+        assertEquals("21", autoCard.getPstate());
+        assertEquals("16", manualCard.getPstate());
+        assertEquals("teacher-1", autoCard.getAdjudgeuser());
+        verify(cardMapper).updateById(autoCard);
+        verify(cardMapper, never()).updateById(manualCard);
+    }
+
+    @Test
+    void judgeBatchThrowsWhenNothingCanBeJudged() {
+        ExamCard manualCard = card("card-1", "paper-1", "room-1", "user-1", "16");
+        ExamCardPoint pendingPoint = cardPoint("card-1", "version-1", 0);
+        pendingPoint.setReviewRequired("1");
+        when(cardMapper.selectById("card-1")).thenReturn(manualCard);
+        when(cardPointMapper.selectList(any())).thenReturn(List.of(pendingPoint));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.judgeBatch(List.of("card-1"), "teacher-1", "Teacher One"));
+
+        assertEquals("所选答卷均仍需人工阅卷或无待批改答卷", error.getMessage());
         verify(cardMapper, never()).updateById(any(ExamCard.class));
     }
 

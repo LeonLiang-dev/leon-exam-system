@@ -288,13 +288,50 @@ public class CardServiceImpl implements CardService {
 
     @Override
     @Transactional
-    public void judgeBatch(List<String> cardIds, String judgeUserId, String judgeUserName) {
+    public Map<String, Object> judgeBatch(List<String> cardIds, String judgeUserId, String judgeUserName) {
         if (cardIds == null || cardIds.isEmpty()) {
             throw BizException.fail("请选择要阅卷的答卷");
         }
+        int judged = 0;
+        int skipped = 0;
         for (String cardId : cardIds) {
-            judge(cardId, null, judgeUserId, judgeUserName);
+            ExamCard card = cardMapper.selectById(cardId);
+            if (card == null) {
+                skipped++;
+                continue;
+            }
+            if (!CARD_SUBMITTED.equals(card.getPstate()) && !CARD_JUDGED.equals(card.getPstate())) {
+                skipped++;
+                continue;
+            }
+            List<ExamCardPoint> points = cardPointMapper.selectList(
+                    new LambdaQueryWrapper<ExamCardPoint>()
+                            .eq(ExamCardPoint::getCardid, cardId));
+            boolean stillRequiresReview = points.stream()
+                    .anyMatch(p -> REVIEW_REQUIRED.equals(p.getReviewRequired()));
+            if (stillRequiresReview) {
+                skipped++;
+                continue;
+            }
+            int totalPoint = points.stream()
+                    .mapToInt(p -> p.getPoint() != null ? p.getPoint() : 0)
+                    .sum();
+            card.setPoint((float) totalPoint);
+            card.setAdjudgeuser(judgeUserId);
+            card.setAdjudgeusername(judgeUserName);
+            card.setAdjudgetime(ExamTimeUtils.nowCompact());
+            card.setAdjudgeuseruuid(judgeUserId);
+            card.setPstate(CARD_JUDGED);
+            cardMapper.updateById(card);
+            judged++;
         }
+        if (judged == 0) {
+            throw BizException.fail(skipped > 0 ? "所选答卷均仍需人工阅卷或无待批改答卷" : "请选择要阅卷的答卷");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("judged", judged);
+        result.put("skipped", skipped);
+        return result;
     }
 
     private void judgeQuestionPoints(List<JudgeDTO.JudgePointDTO> points, Map<String, ExamCardPoint> pointMap) {
@@ -468,7 +505,8 @@ public class CardServiceImpl implements CardService {
                         .mapToInt(answer -> answer.getPoint() != null ? answer.getPoint() : 0)
                         .sum();
             }
-            totalPoint += earnedPoint;
+            int roundedPoint = Math.round(earnedPoint);
+            totalPoint += roundedPoint;
 
             ExamCardPoint cp = new ExamCardPoint();
             cp.setId(UUID.randomUUID().toString().replace("-", ""));
