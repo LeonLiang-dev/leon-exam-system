@@ -267,6 +267,42 @@ class RoomServiceImplParticipationTest {
     }
 
     @Test
+    void publishRejectsClosedRoom() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "31", "1"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.publish("room-1", "teacher-1"));
+
+        assertEquals("只有草稿状态的答题室允许发布", error.getMessage());
+        verify(roomPaperMapper, never()).selectCount(any());
+        verify(roomMapper, never()).updateById(any(ExamRoom.class));
+    }
+
+    @Test
+    void deleteAllowsClosedRoom() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "31", "1"));
+        when(cardMapper.selectList(any())).thenReturn(List.of());
+
+        service.delete("room-1", "teacher-1");
+
+        verify(cardMapper).delete(any());
+        verify(roomPaperMapper).delete(any());
+        verify(roomUserMapper).delete(any());
+        verify(roomMapper).deleteById("room-1");
+    }
+
+    @Test
+    void updateRejectsClosedRoom() {
+        when(roomMapper.selectById("room-1")).thenReturn(room("room-1", "31", "1"));
+
+        BizException error = assertThrows(BizException.class,
+                () -> service.update("room-1", new com.wts.exam.dto.RoomDTO(), "teacher-1"));
+
+        assertEquals("只有草稿状态的答题室允许修改", error.getMessage());
+        verify(roomMapper, never()).updateById(any(ExamRoom.class));
+    }
+
+    @Test
     void createForcesRoomStateToDraft() {
         RoomDTO dto = roomDto("21");
 
