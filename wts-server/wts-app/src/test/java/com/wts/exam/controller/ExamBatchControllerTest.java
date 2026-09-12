@@ -50,6 +50,8 @@ class ExamBatchControllerTest {
     @Mock
     private PermissionService permissionService;
     @Mock
+    private com.wts.exam.mapper.ExamSubjectTypeMapper typeMapper;
+    @Mock
     private com.wts.exam.mapper.ExamCardMapper cardMapper;
     @Mock
     private com.wts.exam.mapper.ExamRoomMapper roomMapper;
@@ -68,7 +70,14 @@ class ExamBatchControllerTest {
 
     @Test
     void subjectTypeBatchDeleteDelegatesNormalizedIds() {
-        SubjectTypeController controller = new SubjectTypeController(subjectTypeService, currentUserProvider);
+        SubjectTypeController controller = new SubjectTypeController(subjectTypeService, currentUserProvider, permissionService, typeMapper);
+
+        com.wts.exam.entity.ExamSubjectType type = new com.wts.exam.entity.ExamSubjectType();
+        type.setId("type-1");
+        type.setCuser("admin-1");
+        when(typeMapper.selectById("type-1")).thenReturn(type);
+        when(typeMapper.selectById("type-2")).thenReturn(type);
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
 
         controller.batchDelete(batchIds(" type-1 ", "type-2", "type-1"));
 

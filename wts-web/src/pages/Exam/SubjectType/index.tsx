@@ -40,6 +40,7 @@ const SubjectTypePage: React.FC = () => {
       title: (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{t.name}</span>
+          {t.orgName && <Tag color="purple">{t.orgName}</Tag>}
           <Tag>{t.children?.length || 0} 子分类</Tag>
           <PlusOutlined
             title="新增子分类"

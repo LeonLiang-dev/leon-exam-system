@@ -85,6 +85,8 @@ class AllApiControllerSmokeTest {
     @Mock
     private SubjectTypeService subjectTypeService;
     @Mock
+    private com.wts.exam.mapper.ExamSubjectTypeMapper subjectTypeMapper;
+    @Mock
     private SubjectService subjectService;
     @Mock
     private SubjectImportService subjectImportService;
@@ -188,9 +190,15 @@ class AllApiControllerSmokeTest {
 
     @Test
     void subjectTypeEndpointsAreCallable() {
-        SubjectTypeController controller = new SubjectTypeController(subjectTypeService, currentUserProvider);
+        SubjectTypeController controller = new SubjectTypeController(subjectTypeService, currentUserProvider, permissionService, subjectTypeMapper);
 
-        when(subjectTypeService.getTree()).thenReturn(List.of());
+        ExamSubjectType type = new ExamSubjectType();
+        type.setId("type-1");
+        type.setCuser("admin-1");
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
+        when(subjectTypeService.getTree(isNull())).thenReturn(List.of());
+        when(subjectTypeMapper.selectById("type-1")).thenReturn(type);
+        when(subjectTypeMapper.selectById("type-2")).thenReturn(type);
 
         assertOk(controller.tree());
         assertOk(controller.create(new ExamSubjectType()));

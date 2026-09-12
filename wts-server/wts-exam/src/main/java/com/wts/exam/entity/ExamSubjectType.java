@@ -30,4 +30,8 @@ public class ExamSubjectType implements Serializable {
 
     @TableField(exist = false)
     private List<ExamSubjectType> children;
+
+    /** 创建人所属教研室名称（非表字段，树查询时填充） */
+    @TableField(exist = false)
+    private String orgName;
 }
