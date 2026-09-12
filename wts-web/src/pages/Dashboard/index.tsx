@@ -62,6 +62,8 @@ const DashboardPage: React.FC = () => {
     },
   ];
 
+  const classStats: any[] = Array.isArray(stats.classStats) ? stats.classStats : [];
+
   return (
     <div className="wts-page">
       <div className="wts-page-header">
@@ -97,6 +99,29 @@ const DashboardPage: React.FC = () => {
                 </Card>
               </Col>
             ))}
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} lg={12} style={{ animation: 'wts-fadeIn 0.4s ease-out both', animationDelay: '0.25s' }}>
+              <Card className="wts-stat-card" variant="outlined" title="班级答卷分布" extra={<span style={{ color: '#94a3b8', fontSize: 12 }}>已提交/已阅卷答卷按班级统计</span>}>
+                {classStats.length === 0 ? (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: '#94a3b8' }}>暂无班级统计数据（学生导入时填写班级后显示）</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {classStats.map((item) => (
+                      <div key={item.className} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ width: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{item.className}</span>
+                        <div style={{ flex: 1, height: 8, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: 4, background: 'linear-gradient(90deg,#4f46e5,#818cf8)', width: `${Math.min(100, (item.cardCount / Math.max(classStats[0]?.cardCount, 1)) * 100)}%` }} />
+                        </div>
+                        <span style={{ width: 60, textAlign: 'right', color: '#475569' }}>{item.cardCount} 份</span>
+                        <span style={{ width: 56, textAlign: 'right', color: '#94a3b8' }}>均分 {item.avgPoint ?? '-'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </Col>
           </Row>
 
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>

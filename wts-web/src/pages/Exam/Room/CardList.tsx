@@ -59,10 +59,17 @@ const CardListPage: React.FC = () => {
 
   const columns: ProColumns[] = [
     {
-      title: '用户ID',
-      dataIndex: 'userid',
-      width: 200,
-      ellipsis: true,
+      title: '学生',
+      dataIndex: 'userName',
+      width: 120,
+      render: (_, record) => record.userName || record.userid || '-',
+    },
+    {
+      title: '班级',
+      dataIndex: 'className',
+      width: 120,
+      hideInSearch: true,
+      render: (_, record) => record.className || '-',
     },
     {
       title: '得分',

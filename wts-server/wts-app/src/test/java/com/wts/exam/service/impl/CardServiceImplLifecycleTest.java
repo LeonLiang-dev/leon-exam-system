@@ -1,5 +1,6 @@
 package com.wts.exam.service.impl;
 
+import com.wts.auth.mapper.SysUserMapper;
 import com.wts.common.exception.BizException;
 import com.wts.exam.dto.CardAnswerDTO;
 import com.wts.exam.dto.CardSubmitDTO;
@@ -75,6 +76,8 @@ class CardServiceImplLifecycleTest {
     private ExamPaperChapterMapper chapterMapper;
     @Mock
     private ExamSubjectMapper subjectMapper;
+    @Mock
+    private SysUserMapper sysUserMapper;
 
     private CardServiceImpl service;
 
@@ -93,7 +96,8 @@ class CardServiceImplLifecycleTest {
                 chapterMapper,
                 subjectMapper,
                 new RoomParticipationPolicy(roomUserMapper),
-                new CardAnswerGrader()
+                new CardAnswerGrader(),
+                sysUserMapper
         );
     }
 

@@ -49,6 +49,7 @@ public class DashboardController {
         data.put("roomCount", roomCount);
         data.put("cardCount", cardCount);
         data.put("userCount", userCount);
+        data.put("classStats", cardMapper.countCardsByClass());
         return R.ok(data);
     }
 }

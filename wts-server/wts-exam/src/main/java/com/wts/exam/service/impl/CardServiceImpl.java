@@ -38,6 +38,7 @@ public class CardServiceImpl implements CardService {
     private final ExamSubjectMapper subjectMapper;
     private final RoomParticipationPolicy roomParticipationPolicy;
     private final CardAnswerGrader cardAnswerGrader;
+    private final com.wts.auth.mapper.SysUserMapper sysUserMapper;
     private static final String CARD_IN_PROGRESS = "11";
     private static final String CARD_SUBMITTED = "16";
     private static final String CARD_JUDGED = "21";
@@ -802,7 +803,31 @@ public class CardServiceImpl implements CardService {
         LambdaQueryWrapper<ExamCard> wrapper = new LambdaQueryWrapper<ExamCard>()
                 .eq(ExamCard::getRoomid, roomId)
                 .orderByDesc(ExamCard::getSubmittime);
-        return PageResult.of(cardMapper.selectPage(new Page<>(page, size), wrapper));
+        Page<ExamCard> result = cardMapper.selectPage(new Page<>(page, size), wrapper);
+        fillStudentInfo(result.getRecords());
+        return PageResult.of(result);
+    }
+
+    /** 批量填充答卷学生姓名与班级（一次 IN 查询） */
+    private void fillStudentInfo(List<ExamCard> cards) {
+        if (cards == null || cards.isEmpty()) {
+            return;
+        }
+        List<String> userIds = cards.stream().map(ExamCard::getUserid).filter(Objects::nonNull).distinct().toList();
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Map<String, com.wts.auth.entity.SysUser> userMap = sysUserMapper.selectList(
+                        new LambdaQueryWrapper<com.wts.auth.entity.SysUser>()
+                                .in(com.wts.auth.entity.SysUser::getId, userIds))
+                .stream().collect(Collectors.toMap(com.wts.auth.entity.SysUser::getId, u -> u, (a, b) -> a));
+        for (ExamCard card : cards) {
+            com.wts.auth.entity.SysUser user = userMap.get(card.getUserid());
+            if (user != null) {
+                card.setUserName(user.getName());
+                card.setClassName(user.getClassName());
+            }
+        }
     }
 
     private String valueOrEmpty(String value) {

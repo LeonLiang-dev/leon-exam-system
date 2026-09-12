@@ -1,5 +1,6 @@
 package com.wts.exam.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -34,4 +35,12 @@ public class ExamCard implements Serializable {
     private String useruuid;
     private String adjudgeuseruuid;
     private String statistical;
+
+    /** 学生姓名（非表字段，答卷列表返回时填充） */
+    @TableField(exist = false)
+    private String userName;
+
+    /** 学生班级（非表字段，答卷列表返回时填充） */
+    @TableField(exist = false)
+    private String className;
 }

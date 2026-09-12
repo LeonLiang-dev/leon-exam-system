@@ -53,6 +53,7 @@ services:
     network_mode: host
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      TZ: ${TZ:-Asia/Shanghai}
       SERVER_PORT: ${SERVER_PORT:-8080}
       DB_URL: jdbc:mysql://127.0.0.1:${DB_PORT:-3306}/${DB_NAME:-wts}?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       DB_USERNAME: ${DB_USERNAME:-wts}

@@ -52,6 +52,8 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-12345678}
       SPRING_PROFILES_ACTIVE: dev
+      # 统一时区，保证考试时间窗计算一致
+      TZ: Asia/Shanghai
     volumes:
       - ../../wts-server:/workspace
       - ./scripts:/scripts:ro
