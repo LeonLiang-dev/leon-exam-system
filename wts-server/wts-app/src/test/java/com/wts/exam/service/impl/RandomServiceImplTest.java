@@ -89,7 +89,7 @@ class RandomServiceImplTest {
         when(itemMapper.selectById("missing")).thenReturn(null);
 
         BizException error = assertThrows(BizException.class,
-                () -> service.generatePapers("missing", 1, "teacher-1"));
+                () -> service.generatePapers("missing", 1, "teacher-1", null));
 
         assertEquals(404, error.getCode());
         verifyNoInteractions(paperMapper, chapterMapper, paperSubjectMapper);
@@ -101,7 +101,7 @@ class RandomServiceImplTest {
         when(stepMapper.selectList(any())).thenReturn(List.of());
 
         BizException error = assertThrows(BizException.class,
-                () -> service.generatePapers("item-1", 1, "teacher-1"));
+                () -> service.generatePapers("item-1", 1, "teacher-1", null));
 
         assertEquals("规则步骤为空", error.getMessage());
         verify(paperMapper, never()).insert(any(ExamPaper.class));
@@ -116,7 +116,7 @@ class RandomServiceImplTest {
         when(subjectMapper.selectList(any())).thenReturn(List.of(subject("subject-1", "type-1")));
         when(versionMapper.selectOne(any())).thenReturn(listedVersion);
 
-        List<String> paperIds = service.generatePapers("item-1", 1, "teacher-1");
+        List<String> paperIds = service.generatePapers("item-1", 1, "teacher-1", null);
 
         assertEquals(1, paperIds.size());
         ArgumentCaptor<ExamPaper> paperCaptor = ArgumentCaptor.forClass(ExamPaper.class);

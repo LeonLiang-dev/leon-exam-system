@@ -18,5 +18,5 @@ public interface RandomService {
     void deleteStep(String id);
     void deleteStepsBatch(List<String> ids);
     /** Generate N random papers based on the item's steps. Returns list of created paper IDs. */
-    List<String> generatePapers(String itemId, int count, String operatorId);
+    List<String> generatePapers(String itemId, int count, String operatorId, java.util.List<String> ownerIds);
 }

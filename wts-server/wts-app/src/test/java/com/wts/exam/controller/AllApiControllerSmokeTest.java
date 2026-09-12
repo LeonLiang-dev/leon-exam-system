@@ -315,7 +315,8 @@ class AllApiControllerSmokeTest {
         when(randomService.getSteps("item-1")).thenReturn(List.of(new ExamRandomStep()));
         when(randomService.addStep(eq("item-1"), any(RandomItemDTO.RandomStepDTO.class))).thenReturn(new ExamRandomStep());
         when(randomService.updateStep(eq("step-1"), any(RandomItemDTO.RandomStepDTO.class))).thenReturn(new ExamRandomStep());
-        when(randomService.generatePapers("item-1", 2, "admin-1")).thenReturn(List.of("paper-1", "paper-2"));
+        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
+        when(randomService.generatePapers("item-1", 2, "admin-1", null)).thenReturn(List.of("paper-1", "paper-2"));
 
         assertOk(controller.listItems());
         assertOk(controller.createItem(itemDTO));

@@ -146,7 +146,7 @@ public class RandomServiceImpl implements RandomService {
 
     @Override
     @Transactional
-    public List<String> generatePapers(String itemId, int count, String operatorId) {
+    public List<String> generatePapers(String itemId, int count, String operatorId, List<String> ownerIds) {
         ExamRandomItem item = itemMapper.selectById(itemId);
         if (item == null) throw BizException.notFound("随机规则");
 
@@ -204,6 +204,9 @@ public class RandomServiceImpl implements RandomService {
                 if (step.getTiptype() != null) {
                     versionWrapper.eq(ExamSubjectVersion::getTiptype, step.getTiptype());
                 }
+                if (ownerIds != null && !ownerIds.isEmpty()) {
+                    versionWrapper.in(ExamSubjectVersion::getCuser, ownerIds);
+                }
 
                 List<ExamSubjectVersion> versions = versionMapper.selectList(versionWrapper);
                 if (versions.isEmpty()) continue;
@@ -255,6 +258,9 @@ public class RandomServiceImpl implements RandomService {
             }
 
             // Update paper stats
+            if (totalSubjects == 0) {
+                throw BizException.fail("当前规则在可选题目范围内抽不出题目，请调整题型/分类或先补充题目");
+            }
             paper.setSubjectnum(totalSubjects);
             paper.setPointnum(totalPoints);
             paperMapper.updateById(paper);

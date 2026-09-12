@@ -194,7 +194,7 @@ public class CardServiceImpl implements CardService {
         if (card == null) throw BizException.notFound("答卷");
         ensureCardOwner(card, userId);
         // 交卷不校验答题时间窗：时间到后仍允许提交，避免学生答案丢失；是否超时通过 overtime 标记
-        ensureCardActive(card);
+        ensureCardCanSubmit(card);
         ExamRoom room = roomMapper.selectById(card.getRoomid());
         boolean overtime = isOvertime(card, room);
         saveAnswersForCard(cardId, dto, userId);
@@ -695,6 +695,23 @@ public class CardServiceImpl implements CardService {
         if (end != null && now.isAfter(end)) {
             throw BizException.fail("答题室已结束，无法作答");
         }
+    }
+
+    /**
+     * 交卷前置校验：答卷处于进行中即可。
+     * 答题室已关闭/已结束也放行交卷（老师关闭答题室或考试结束后，进行中的学生仍可提交，
+     * 防止答案丢失），仅拦截未开放（草稿/未发布，学生无法进入）。
+     */
+    private void ensureCardCanSubmit(ExamCard card) {
+        if (!CARD_IN_PROGRESS.equals(card.getPstate())) {
+            throw BizException.fail("答卷已提交，无法修改");
+        }
+        ExamRoom room = roomMapper.selectById(card.getRoomid());
+        if (room == null) throw BizException.notFound("答题室");
+        if (ROOM_PUBLISHED.equals(room.getPstate()) || ROOM_CLOSED.equals(room.getPstate())) {
+            return;
+        }
+        throw BizException.fail("答题室未开放");
     }
 
     /**
