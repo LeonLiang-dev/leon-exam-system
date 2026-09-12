@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, history } from '@umijs/max';
-import { Button, message, Spin, Card, Input, InputNumber, Tag, Space, Divider, Modal } from 'antd';
+import { App, Button, Spin, Card, Input, InputNumber, Tag, Space, Divider, Modal } from 'antd';
 import { getCardPaperForReview, getCardResult, judgeCard } from '@/services/exam';
 import AnswerValueView, { getCardAnswerDisplayValues } from './AnswerValueView';
 
@@ -10,6 +10,7 @@ const TIPTYPE_LABELS: Record<string, string> = {
 };
 
 const JudgePage: React.FC = () => {
+  const { message } = App.useApp();
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [paperData, setPaperData] = useState<any>(null);

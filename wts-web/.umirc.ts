@@ -1,7 +1,10 @@
 import { defineConfig } from '@umijs/max';
 
 export default defineConfig({
-  antd: {},
+  antd: {
+    // 启用 antd App 容器，使 App.useApp() 能读取动态主题上下文
+    appConfig: {},
+  },
   access: {},
   model: {},
   initialState: {},
@@ -12,7 +15,8 @@ export default defineConfig({
   },
   proxy: {
     '/api': {
-      target: 'http://localhost:8080',
+      // 容器内开发时通过 PROXY_TARGET 指向后端服务名（如 http://backend:8080）
+      target: process.env.PROXY_TARGET || 'http://localhost:8080',
       changeOrigin: true,
     },
   },

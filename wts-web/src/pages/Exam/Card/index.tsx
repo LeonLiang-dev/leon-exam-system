@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, history } from '@umijs/max';
-import { Button, message, Modal, Spin, Row, Col, Card as AntCard, Drawer } from 'antd';
+import { App, Button, Modal, Spin, Row, Col, Card as AntCard, Drawer } from 'antd';
 import { ClockCircleOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { getCardPaper, saveCardAnswers, submitCard } from '@/services/exam';
 import { getRequestErrorMessage, parseExamDateTime } from '@/utils/examTime';
@@ -10,6 +10,7 @@ import AnswerSheet from './AnswerSheet';
 const isMobile = () => window.innerWidth < 768;
 
 const ExamCardPage: React.FC = () => {
+  const { message } = App.useApp();
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [paperData, setPaperData] = useState<any>(null);

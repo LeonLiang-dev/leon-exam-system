@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message } from 'antd';
+import { App, Form, Input, Button, Card } from 'antd';
 import { LockOutlined, LoginOutlined, UserOutlined } from '@ant-design/icons';
 import { login, LoginParams } from '@/services/auth';
 
 const LoginPage: React.FC = () => {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
 
   const onFinish = async (values: LoginParams) => {

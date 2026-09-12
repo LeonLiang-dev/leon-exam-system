@@ -6,6 +6,7 @@
 | 目录 | 目标系统 | 方案 | 说明 |
 |------|----------|------|------|
 | [linux-docker/](linux-docker/README.md) | Linux（机房推荐） | Docker Compose | `mariadb + 后端` 两个容器，首次启动自动建库导数据；支持 host 网络自动放行机房网段 |
+| [macos-dev/](macos-dev/README.md) | macOS（本地调试） | Docker 全栈 + 自动更新 | `mariadb + 后端 + 前端` 三容器，源码挂载 HMR 热更新；`update.sh` 自动拉取代码并重启 |
 | [windows-exe/](windows-exe/README.md) | Windows（教师机） | 启动器 exe 一键安装包 | 现状方案：`build.bat package` 打包，双击运行，详见 `docs/windows-teacher-installer.md` |
 
 ## 选择建议

@@ -1,0 +1,85 @@
+# ============================================================
+# Leon 在线考试系统 — macOS 本地 Docker 全栈调试环境
+#
+# 快速开始:
+#   1. 确保已安装 Docker Desktop for Mac
+#   2. docker compose up -d
+#   3. 浏览器访问 http://localhost:8000
+#
+# 组成: db(mariadb) + backend(maven:jdk17) + frontend(node20)
+# 源码通过 bind mount 挂载，前端 HMR 热更新，后端改代码后
+# docker compose restart backend 重新编译启动。
+# ============================================================
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: leonexam-dev-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_PASSWORD:-12345678}
+      MARIADB_DATABASE: wts
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    ports:
+      # 仅绑定本机，数据库不对外网暴露
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      # 首次启动自动执行初始化 SQL（复用 linux-docker 的 initdb，保持单一数据源）
+      - ../linux-docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  backend:
+    image: maven:3.9-eclipse-temurin-17
+    container_name: leonexam-dev-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /workspace
+    command: ["sh", "/scripts/dev-backend.sh"]
+    environment:
+      # 容器内通过服务名 db 访问数据库（覆盖 application-dev.yml 的 localhost）
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/wts?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-12345678}
+      SPRING_PROFILES_ACTIVE: dev
+    volumes:
+      - ../../wts-server:/workspace
+      - ./scripts:/scripts:ro
+      - m2-repo:/root/.m2
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+  frontend:
+    image: node:20-alpine
+    container_name: leonexam-dev-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    working_dir: /workspace
+    command: ["sh", "/scripts/dev-frontend.sh"]
+    environment:
+      # 代理指向后端容器（compose 服务名 backend）
+      PROXY_TARGET: http://backend:8080
+      HOST: 0.0.0.0
+      PORT: 8000
+    volumes:
+      - ../../wts-web:/workspace
+      - ./scripts:/scripts:ro
+      - node-modules:/workspace/node_modules
+    ports:
+      - "${FRONTEND_PORT:-8000}:8000"
+
+volumes:
+  db-data:
+  m2-repo:
+  node-modules:

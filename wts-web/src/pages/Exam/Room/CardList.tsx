@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, history } from '@umijs/max';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
-import { Button, message, Modal, Tag, Space } from 'antd';
+import { App, Button, Modal, Tag, Space } from 'antd';
 import { CheckCircleOutlined, ReloadOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { getRoomCards, batchJudgeCards } from '@/services/exam';
 
@@ -12,6 +12,7 @@ const PSTATE_MAP: Record<string, { text: string; color: string }> = {
 };
 
 const CardListPage: React.FC = () => {
+  const { message } = App.useApp();
   const { roomId } = useParams<{ roomId: string }>();
   const actionRef = useRef<ActionType>();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);

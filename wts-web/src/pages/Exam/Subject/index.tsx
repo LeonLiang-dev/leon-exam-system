@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import {
-  Button, message, Modal, Form, Input, Select, Popconfirm, Space, InputNumber, Card, TreeSelect, Upload, Image,
+  App, Button, Modal, Form, Input, Select, Popconfirm, Space, InputNumber, Card, TreeSelect, Upload, Image,
 } from 'antd';
 import {
   DeleteOutlined,
@@ -108,6 +108,7 @@ const normalizeSingleChoiceAnswers = (answers: any[] = [], correctIndex?: number
 };
 
 const SubjectPage: React.FC = () => {
+  const { message } = App.useApp();
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<any>(null);

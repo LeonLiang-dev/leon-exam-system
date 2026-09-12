@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tree, Button, Modal, Form, Input, InputNumber, message, Space, Popconfirm, Empty, Tag } from 'antd';
+import { App, Card, Tree, Button, Modal, Form, Input, InputNumber, Space, Popconfirm, Empty, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getSubjectTypeTree,
@@ -10,6 +10,7 @@ import {
 } from '@/services/exam';
 
 const SubjectTypePage: React.FC = () => {
+  const { message } = App.useApp();
   const [treeData, setTreeData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);

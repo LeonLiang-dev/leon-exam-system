@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import {
-  Button, message, Modal, Form, Input, InputNumber, Select, Popconfirm, Space, Card, Row, Col, Table,
+  App, Button, Modal, Form, Input, InputNumber, Select, Popconfirm, Space, Card, Row, Col, Table,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, ThunderboltOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
@@ -18,6 +18,7 @@ const TIPTYPE_OPTIONS = [
 ];
 
 const RandomPage: React.FC = () => {
+  const { message } = App.useApp();
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [stepModalOpen, setStepModalOpen] = useState(false);

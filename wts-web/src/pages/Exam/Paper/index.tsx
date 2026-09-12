@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
-import { Button, message, Modal, Form, Input, InputNumber, Popconfirm, Space, Select, Tag } from 'antd';
+import { App, Button, Modal, Form, Input, InputNumber, Popconfirm, Space, Select, Tag } from 'antd';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import {
   getPapers, createPaper, updatePaper, deletePaper, batchDeletePapers,
@@ -12,6 +12,7 @@ const TIPTYPE_LABELS: Record<string, string> = {
 };
 
 const PaperPage: React.FC = () => {
+  const { message } = App.useApp();
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPaper, setEditingPaper] = useState<any>(null);

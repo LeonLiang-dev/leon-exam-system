@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radio, Checkbox, Input, Tag, Space, Button, Image as AntImage, message, Upload } from 'antd';
+import { App, Radio, Checkbox, Input, Tag, Space, Button, Image as AntImage, Upload } from 'antd';
 import { DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 
 const TIPTYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -89,6 +89,7 @@ const getPastedImageFile = (event: React.ClipboardEvent): File | null => {
 };
 
 const QuestionItem: React.FC<Props> = ({ index, subject, value, onChange, mobile }) => {
+  const { message } = App.useApp();
   const typeInfo = TIPTYPE_LABELS[subject.tiptype] || { label: '未知', color: 'default' };
 
   const getSubjectiveValue = () => {

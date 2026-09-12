@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
-import { Button, message, Modal, Form, Input, Select, Popconfirm, Space, Upload } from 'antd';
+import { App, Button, Modal, Form, Input, Select, Popconfirm, Space, Upload } from 'antd';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UploadOutlined } from '@ant-design/icons';
 import {
   getUsers,
@@ -15,6 +15,7 @@ import {
 } from '@/services/system';
 
 const UserPage: React.FC = () => {
+  const { message } = App.useApp();
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);

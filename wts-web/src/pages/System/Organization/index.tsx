@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Tree, Button, Modal, Form, Input, InputNumber, Select, message, Space, Spin, Popconfirm } from 'antd';
+import { App, Card, Tree, Button, Modal, Form, Input, InputNumber, Select, Space, Spin, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getOrganizationTree,
@@ -17,6 +17,7 @@ interface OrgNode {
 }
 
 const OrganizationPage: React.FC = () => {
+  const { message } = App.useApp();
   const [treeData, setTreeData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedNode, setSelectedNode] = useState<OrgNode | null>(null);

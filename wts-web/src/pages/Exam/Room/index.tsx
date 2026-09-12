@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { history } from '@umijs/max';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import {
-  Button, message, Modal, Form, Input, InputNumber, Select, Popconfirm, Space, Tag, DatePicker,
+  App, Button, Modal, Form, Input, InputNumber, Select, Popconfirm, Space, Tag, DatePicker,
 } from 'antd';
 import dayjs from 'dayjs';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
@@ -64,6 +64,7 @@ const getPublishValidationMessage = (room: any) => {
 };
 
 const RoomPage: React.FC = () => {
+  const { message } = App.useApp();
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<any>(null);

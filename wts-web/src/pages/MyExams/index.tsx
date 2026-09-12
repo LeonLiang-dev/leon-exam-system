@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Tag, message, Empty, Spin, Row, Col, Typography, Tooltip } from 'antd';
+import { App, Card, Button, Tag, Empty, Spin, Row, Col, Typography, Tooltip } from 'antd';
 import { history } from '@umijs/max';
 import { ClockCircleOutlined, EyeOutlined, FileTextOutlined, PlayCircleOutlined, ScheduleOutlined } from '@ant-design/icons';
 import { enterRoom, getMyRooms } from '@/services/exam';
@@ -42,6 +42,7 @@ const getRoomWindow = (room: Room) => {
 };
 
 const MyExamsPage: React.FC = () => {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [entering, setEntering] = useState<string | null>(null);
