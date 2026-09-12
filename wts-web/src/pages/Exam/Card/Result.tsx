@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from '@umijs/max';
-import { Card, Tag, Spin, Statistic, Row, Col, Divider, Button, Space, Result } from 'antd';
+import { Card, Tag, Spin, Statistic, Row, Col, Divider, Button, Space, Result, Image } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { getCardResult } from '@/services/exam';
 import { getRequestErrorMessage } from '@/utils/examTime';
@@ -10,6 +10,18 @@ const TIPTYPE_LABELS: Record<string, string> = {
   '1': '填空题', '2': '单选题', '3': '多选题',
   '4': '判断题', '5': '主观题',
 };
+
+const SELECTION_TIPTYPES = new Set(['2', '3', '4']);
+
+const optionLabel = (index: number) =>
+  index >= 0 && index < 26 ? `${String.fromCharCode(65 + index)}. ` : '';
+
+/** 客观题：将选项 id 集合渲染为 "A. xxx / B. xxx" 文本 */
+const optionsToText = (options: any[], optionIds: string[]): string =>
+  options
+    .map((opt, index) => (optionIds.includes(opt.id) ? `${optionLabel(index)}${opt.answer || opt.pcontent || opt.id}` : null))
+    .filter(Boolean)
+    .join('；');
 
 const PSTATE_MAP: Record<string, { text: string; color: string }> = {
   '11': { text: '答题中', color: 'blue' },
@@ -156,6 +168,20 @@ const ExamResultPage: React.FC = () => {
             .map((answer: any) => answer.reviewComment || answer.reviewcomment)
             .filter((comment: string | undefined) => Boolean(comment));
 
+          const tiptype = subject?.tiptype != null ? String(subject.tiptype) : '';
+          const isSelection = SELECTION_TIPTYPES.has(tiptype);
+          const subjectAnswers: any[] = subject?.answers || [];
+          const selectedOptionIds = (cardAns || [])
+            .filter((answer: any) => answer.valstr === 'true')
+            .map((answer: any) => answer.answerid || answer.answerId)
+            .filter(Boolean);
+          const correctOptionIds = subjectAnswers
+            .filter((opt: any) => opt.rightanswer === '1')
+            .map((opt: any) => opt.id);
+          const correctText = isSelection ? optionsToText(subjectAnswers, correctOptionIds) : '';
+          const stem = subject?.tipstr || subject?.introduction || '';
+          const explanation = subject?.tipnote || '';
+
           return (
             <div
               key={pointInfoKey}
@@ -164,6 +190,9 @@ const ExamResultPage: React.FC = () => {
               <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                 <Space>
                   <span style={{ fontWeight: 600 }}>第 {index + 1} 题</span>
+                  {subject?.tiptype != null && (
+                    <Tag>{TIPTYPE_LABELS[tiptype] || `题型${tiptype}`}</Tag>
+                  )}
                   {isCorrect && <Tag color="green">正确 +{earnedPoint}分</Tag>}
                   {isPending && <Tag color="orange">待阅卷</Tag>}
                   {isWrong && <Tag color="red">错误 0分</Tag>}
@@ -172,6 +201,66 @@ const ExamResultPage: React.FC = () => {
                 <span style={{ color: '#999' }}>{earnedPoint}/{maxPoint}分</span>
               </div>
 
+              {/* 题干 */}
+              {stem && (
+                <div style={{ marginBottom: 8, color: '#333', whiteSpace: 'pre-wrap' }}>{stem}</div>
+              )}
+              {subject?.pcontent && (
+                <div style={{ marginBottom: 8 }}>
+                  <Image
+                    src={subject.pcontent}
+                    alt="题干配图"
+                    style={{ maxWidth: 320, borderRadius: 6, border: '1px solid #e5e7eb' }}
+                  />
+                </div>
+              )}
+
+              {/* 全部选项（客观题） */}
+              {isSelection && subjectAnswers.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  {subjectAnswers.map((opt: any, optionIndex: number) => {
+                    const isSelected = selectedOptionIds.includes(opt.id);
+                    const isCorrectOption = correctOptionIds.includes(opt.id);
+                    const stateClass = isSelected && isCorrectOption
+                      ? 'wts-option-selected-correct'
+                      : isSelected
+                        ? 'wts-option-selected-wrong'
+                        : isCorrectOption
+                          ? 'wts-option-correct'
+                          : '';
+                    return (
+                      <div
+                        key={opt.id || optionIndex}
+                        className={`wts-option ${stateClass}`}
+                        style={{
+                          padding: '6px 10px',
+                          marginBottom: 4,
+                          borderRadius: 6,
+                          border: '1px solid #e5e7eb',
+                          background: isSelected && isCorrectOption ? '#ecfdf5' : isSelected ? '#fef2f2' : isCorrectOption ? '#f0fdf4' : '#fff',
+                          borderColor: isSelected && isCorrectOption ? '#34d399' : isSelected ? '#f87171' : isCorrectOption ? '#4ade80' : '#e5e7eb',
+                          color: '#333',
+                        }}
+                      >
+                        {optionLabel(optionIndex)}
+                        {opt.answer || opt.pcontent || opt.id}
+                        {isSelected && <Tag color={isCorrectOption ? 'green' : 'red'} style={{ marginLeft: 8 }}>我的选择</Tag>}
+                        {isCorrectOption && <Tag color="green" style={{ marginLeft: 4 }}>正确答案</Tag>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 正确答案（客观题） */}
+              {isSelection && correctText && (
+                <div style={{ marginBottom: 8, color: '#15803d' }}>
+                  <span style={{ color: '#666' }}>正确答案：</span>
+                  <span style={{ fontWeight: 500 }}>{correctText}</span>
+                </div>
+              )}
+
+              {/* 你的答案 */}
               <div style={{ marginBottom: 8, color: '#333' }}>
                 {displayAnswers.length > 0 ? (
                   <div>
@@ -189,6 +278,13 @@ const ExamResultPage: React.FC = () => {
                   <span style={{ color: '#999' }}>未作答</span>
                 )}
               </div>
+
+              {/* 解析 */}
+              {explanation && (
+                <div style={{ marginTop: 8, color: '#666' }}>
+                  <span style={{ color: '#999' }}>解析：</span>{explanation}
+                </div>
+              )}
               {pointComment && (
                 <div style={{ marginTop: 8, color: '#666' }}>
                   阅卷批注：{pointComment}
