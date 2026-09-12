@@ -12,6 +12,7 @@ export interface LoginResult {
   loginName: string;
   name: string;
   userType: string;
+  post?: string;
 }
 
 export interface UserInfo {
@@ -19,6 +20,7 @@ export interface UserInfo {
   loginName: string;
   name: string;
   userType: string;
+  post?: string;
   permissions: string[];
 }
 

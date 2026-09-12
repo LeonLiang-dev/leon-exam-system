@@ -3,6 +3,7 @@ import type { RequestConfig, RunTimeLayoutConfig } from '@umijs/max';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { getCurrentUser } from '@/services/auth';
+import { resolvePost } from '@/access';
 import './global.less';
 
 // 管理端路径前缀（用 / 结尾来精确匹配路径段）
@@ -68,12 +69,12 @@ export const layout: RunTimeLayoutConfig = ({ initialState }) => {
         return;
       }
 
-      // Recompute isAdmin on every navigation to avoid stale closure
-      const userType = initialState?.currentUser?.type;
-      const isAdmin = userType === '3' || userType === '1';
+      // Recompute staff status on every navigation to avoid stale closure
+      const post = resolvePost(initialState?.currentUser);
+      const isStaff = post !== undefined && post !== 'student';
 
       // Students accessing admin pages → redirect
-      if (token && userType && !isAdmin) {
+      if (token && post && !isStaff) {
         const isAdminPath = ADMIN_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
         if (isAdminPath) {
           history.push('/my-exams');

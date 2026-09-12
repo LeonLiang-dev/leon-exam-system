@@ -6,6 +6,8 @@ export async function getUsers(params?: {
   size?: number;
   keyword?: string;
   state?: string;
+  post?: string;
+  className?: string;
 }) {
   return request.get('/users', { params });
 }
@@ -15,6 +17,10 @@ export async function createUser(data: {
   name: string;
   loginname: string;
   type?: string;
+  post?: string;
+  perms?: string;
+  orgId?: string;
+  className?: string;
   comments?: string;
 }) {
   return request.post('/users', data);
@@ -32,7 +38,16 @@ export async function importStudentUsers(file: File) {
 /** 更新用户 */
 export async function updateUser(
   id: string,
-  data: { name?: string; type?: string; state?: string; comments?: string },
+  data: {
+    name?: string;
+    type?: string;
+    state?: string;
+    post?: string;
+    perms?: string;
+    orgId?: string;
+    className?: string;
+    comments?: string;
+  },
 ) {
   return request.put(`/users/${id}`, data);
 }

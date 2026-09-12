@@ -51,7 +51,7 @@ export default defineConfig({
     {
       path: '/exam/room/:roomId/cards',
       component: './Exam/Room/CardList',
-      access: 'isAdmin',
+      access: 'isStaff',
     },
     {
       path: '/',
@@ -62,13 +62,13 @@ export default defineConfig({
       path: '/dashboard',
       component: './Dashboard',
       icon: 'DashboardOutlined',
-      access: 'isAdmin',
+      access: 'isStaff',
     },
     {
       name: '考试管理',
       path: '/exam',
       icon: 'FormOutlined',
-      access: 'isAdmin',
+      access: 'isStaff',
       routes: [
         {
           name: '题目分类',
@@ -101,7 +101,7 @@ export default defineConfig({
       name: '系统管理',
       path: '/system',
       icon: 'SettingOutlined',
-      access: 'isAdmin',
+      access: 'isStaff',
       routes: [
         {
           name: '用户管理',

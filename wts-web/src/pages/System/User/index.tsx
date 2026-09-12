@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
-import { App, Button, Modal, Form, Input, Select, Popconfirm, Space, Upload } from 'antd';
+import { App, Button, Modal, Form, Input, Select, Popconfirm, Space, Upload, TreeSelect, Checkbox, Tag } from 'antd';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UploadOutlined } from '@ant-design/icons';
+import { useModel } from '@umijs/max';
 import {
   getUsers,
   createUser,
@@ -12,17 +13,64 @@ import {
   hardDeleteUsers,
   resetPassword,
   importStudentUsers,
+  getOrganizationTree,
 } from '@/services/system';
+import { resolvePost } from '@/access';
+
+const POST_OPTIONS = [
+  { value: 'student', label: '学生' },
+  { value: 'teacher', label: '教师' },
+  { value: 'director', label: '主任' },
+  { value: 'deputy', label: '副主任' },
+  { value: 'platform_admin', label: '平台管理员' },
+];
+
+const PERM_OPTIONS = [
+  { value: 'EXAM_PUBLISH', label: '发布考试' },
+  { value: 'SUBJECT_MANAGE', label: '试题管理' },
+  { value: 'CLASS_IMPORT', label: '导入班级' },
+  { value: 'USER_MANAGE', label: '用户管理' },
+];
+
+const POST_LABELS: Record<string, { text: string; color: string }> = {
+  student: { text: '学生', color: 'default' },
+  teacher: { text: '教师', color: 'blue' },
+  director: { text: '主任', color: 'purple' },
+  deputy: { text: '副主任', color: 'purple' },
+  platform_admin: { text: '平台管理员', color: 'gold' },
+};
 
 const UserPage: React.FC = () => {
   const { message } = App.useApp();
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const isPlatformAdmin =
+    currentUser?.post === 'platform_admin' || (currentUser?.type === '3' && !currentUser?.post);
+
   const actionRef = useRef<ActionType>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [importing, setImporting] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [batchOperating, setBatchOperating] = useState(false);
+  const [orgTree, setOrgTree] = useState<any[]>([]);
+  const [selectedPost, setSelectedPost] = useState<string>('teacher');
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    getOrganizationTree()
+      .then((res: any) => {
+        setOrgTree((res.data || []).map(normalizeOrgNode));
+      })
+      .catch(() => {});
+  }, []);
+
+  const normalizeOrgNode = (node: any): any => ({
+    title: node.name,
+    value: node.id,
+    key: node.id,
+    children: node.children ? node.children.map(normalizeOrgNode) : undefined,
+  });
 
   const selectedUserIds = selectedRowKeys.map(String);
 
@@ -78,26 +126,65 @@ const UserPage: React.FC = () => {
     });
   };
 
+  const openEdit = (record?: any) => {
+    setEditingUser(record || null);
+    if (record) {
+      form.setFieldsValue({
+        name: record.name,
+        loginname: record.loginname,
+        post: record.post || resolvePost(record),
+        perms: record.perms ? record.perms.split(',').map((p: string) => p.trim()).filter(Boolean) : [],
+        className: record.className,
+        comments: record.comments,
+      });
+      setSelectedPost(record.post || resolvePost(record) || 'teacher');
+    } else {
+      form.setFieldsValue({
+        name: undefined,
+        loginname: undefined,
+        post: 'teacher',
+        perms: ['EXAM_PUBLISH', 'SUBJECT_MANAGE', 'CLASS_IMPORT'],
+        className: undefined,
+        orgId: undefined,
+        comments: undefined,
+      });
+      setSelectedPost('teacher');
+    }
+    setModalOpen(true);
+  };
+
   const columns: ProColumns[] = [
     {
       title: '姓名',
       dataIndex: 'name',
       width: 120,
+      hideInSearch: false,
     },
     {
       title: '登录名',
       dataIndex: 'loginname',
-      width: 120,
+      width: 130,
+      hideInSearch: true,
     },
     {
-      title: '用户类型',
-      dataIndex: 'type',
-      width: 100,
-      valueEnum: {
-        '1': { text: '系统用户' },
-        '2': { text: '其他' },
-        '3': { text: '超级管理员' },
+      title: '职位',
+      dataIndex: 'post',
+      width: 110,
+      valueEnum: Object.fromEntries(
+        POST_OPTIONS.map((o) => [o.value, { text: o.label }]),
+      ),
+      render: (_, record) => {
+        const post = record.post || resolvePost(record);
+        const info = POST_LABELS[post] || { text: post || '-', color: 'default' };
+        return <Tag color={info.color}>{info.text}</Tag>;
       },
+    },
+    {
+      title: '班级',
+      dataIndex: 'className',
+      width: 120,
+      hideInSearch: false,
+      render: (_, record) => record.className || '-',
     },
     {
       title: '状态',
@@ -125,15 +212,7 @@ const UserPage: React.FC = () => {
       width: 280,
       render: (_, record) => (
         <Space>
-          <a
-            onClick={() => {
-              setEditingUser(record);
-              form.setFieldsValue(record);
-              setModalOpen(true);
-            }}
-          >
-            编辑
-          </a>
+          <a onClick={() => openEdit(record)}>编辑</a>
           <Popconfirm
             title="确定重置密码为 123456？"
             onConfirm={async () => {
@@ -174,11 +253,21 @@ const UserPage: React.FC = () => {
 
   const handleOk = async () => {
     const values = await form.validateFields();
+    const payload = {
+      name: values.name,
+      loginname: values.loginname,
+      post: values.post,
+      // platform_admin 的 perms 传空 = 全部权限
+      perms: values.post === 'platform_admin' ? '' : (values.perms || []).join(','),
+      orgId: values.orgId,
+      className: values.className,
+      comments: values.comments,
+    };
     if (editingUser) {
-      await updateUser(editingUser.id, values);
+      await updateUser(editingUser.id, payload);
       message.success('更新成功');
     } else {
-      await createUser(values);
+      await createUser(payload as any);
       message.success('创建成功，初始密码为 123456');
     }
     setModalOpen(false);
@@ -229,11 +318,7 @@ const UserPage: React.FC = () => {
             key="add"
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => {
-              setEditingUser(null);
-              form.resetFields();
-              setModalOpen(true);
-            }}
+            onClick={() => openEdit()}
           >
             新建用户
           </Button>,
@@ -281,8 +366,10 @@ const UserPage: React.FC = () => {
           const res: any = await getUsers({
             page: params.current,
             size: params.pageSize,
-            keyword: params.name || params.loginname,
+            keyword: params.name || params.className || params.post,
             state: params.state,
+            post: params.post,
+            className: params.className,
           });
           return {
             data: res.data?.records || [],
@@ -322,12 +409,39 @@ const UserPage: React.FC = () => {
           >
             <Input placeholder="请输入登录名" disabled={!!editingUser} />
           </Form.Item>
-          <Form.Item name="type" label="用户类型" initialValue="1">
-            <Select>
-              <Select.Option value="1">系统用户</Select.Option>
-              <Select.Option value="2">其他</Select.Option>
-              <Select.Option value="3">超级管理员</Select.Option>
-            </Select>
+          <Form.Item
+            name="post"
+            label="职位"
+            tooltip={isPlatformAdmin ? '调整职位会同时按职位重算默认权限' : '仅平台管理员可调整职位'}
+          >
+            <Select
+              disabled={!isPlatformAdmin}
+              options={POST_OPTIONS}
+              onChange={(value) => {
+                setSelectedPost(value);
+                form.setFieldsValue({
+                  perms: value === 'student' || value === 'platform_admin' ? [] : ['EXAM_PUBLISH', 'SUBJECT_MANAGE', 'CLASS_IMPORT'],
+                });
+              }}
+            />
+          </Form.Item>
+          {selectedPost !== 'student' && isPlatformAdmin && (
+            <Form.Item name="perms" label="功能权限" tooltip="平台管理员全票通过，此处为教师的细粒度权限开关">
+              <Checkbox.Group
+                options={PERM_OPTIONS.filter((o) => o.value !== 'USER_MANAGE')}
+              />
+            </Form.Item>
+          )}
+          <Form.Item name="orgId" label="组织归属" tooltip="选择教研组（主任/副主任选教研室，教师选对应教师分组）">
+            <TreeSelect
+              treeData={orgTree}
+              treeDefaultExpandAll={false}
+              allowClear
+              placeholder="选择组织节点"
+            />
+          </Form.Item>
+          <Form.Item name="className" label="班级" tooltip="学生填写班级，教师可不填">
+            <Input placeholder="请输入班级（学生）" />
           </Form.Item>
           <Form.Item name="comments" label="备注">
             <Input.TextArea rows={2} />
