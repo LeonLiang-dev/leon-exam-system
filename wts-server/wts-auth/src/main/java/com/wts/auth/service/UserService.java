@@ -20,12 +20,14 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -449,6 +451,43 @@ public class UserService {
         }
 
         return result;
+    }
+
+    /**
+     * 生成学生导入模板：表头与导入解析列完全一致（学号/姓名/班级）。
+     */
+    public void downloadTemplate(OutputStream stream) {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet studentSheet = workbook.createSheet("学生");
+            Sheet guideSheet = workbook.createSheet("填写说明");
+
+            // 表头与 importStudents 解析列一致：第0列学号、第1列姓名、第2列班级
+            Row header = studentSheet.createRow(0);
+            String[] headers = {"学号", "姓名", "班级"};
+            for (int i = 0; i < headers.length; i++) {
+                header.createCell(i).setCellValue(headers[i]);
+            }
+            studentSheet.setColumnWidth(0, 20 * 256);
+            studentSheet.setColumnWidth(1, 20 * 256);
+            studentSheet.setColumnWidth(2, 24 * 256);
+
+            // 填写说明放独立 Sheet，导入仅读取第 1 个 Sheet，不会误导入
+            String[] guideLines = {
+                    "模板填写说明",
+                    "1.【学号】学生登录账号，必填，不能重复",
+                    "2.【姓名】必填",
+                    "3.【班级】选填，如 软件2401 班",
+                    "4. 从第2行开始填写；初始密码为 123123",
+            };
+            for (int i = 0; i < guideLines.length; i++) {
+                guideSheet.createRow(i).createCell(0).setCellValue(guideLines[i]);
+            }
+            guideSheet.setColumnWidth(0, 60 * 256);
+
+            workbook.write(stream);
+        } catch (java.io.IOException e) {
+            throw BizException.fail("生成模板失败: " + e.getMessage());
+        }
     }
 
     private void importStudent(

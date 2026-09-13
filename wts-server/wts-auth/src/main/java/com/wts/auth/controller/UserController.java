@@ -17,7 +17,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -69,6 +72,21 @@ public class UserController {
             return R.ok(userService.importStudents(file.getInputStream(), user.id()));
         } catch (IOException e) {
             throw BizException.fail("读取上传文件失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/import-template")
+    public void downloadTemplate(HttpServletResponse response) {
+        CurrentUser user = currentUserProvider.require();
+        permissionService.require(user, Permission.CLASS_IMPORT.name());
+        try {
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition",
+                    "attachment; filename=" + URLEncoder.encode("学生导入模板.xlsx", StandardCharsets.UTF_8));
+            userService.downloadTemplate(response.getOutputStream());
+            response.getOutputStream().flush();
+        } catch (Exception e) {
+            throw BizException.fail("下载模板失败: " + e.getMessage());
         }
     }
 

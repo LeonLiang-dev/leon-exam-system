@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ProTable, type ActionType, type ProColumns, type ProFormInstance } from '@ant-design/pro-components';
 import { App, Button, Modal, Form, Input, Popconfirm, Space, Upload, TreeSelect, Tag } from 'antd';
-import { DeleteOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UploadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UploadOutlined } from '@ant-design/icons';
 import { useModel } from '@umijs/max';
 import {
   getUsers,
@@ -13,6 +13,7 @@ import {
   hardDeleteUsers,
   resetPassword,
   importStudentUsers,
+  downloadStudentTemplate,
   getOrganizationTree,
 } from '@/services/system';
 
@@ -30,6 +31,7 @@ const StudentPage: React.FC = () => {
   const actionRef = useRef<ActionType>();
   const proFormRef = useRef<ProFormInstance>();
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [importing, setImporting] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -290,10 +292,26 @@ const StudentPage: React.FC = () => {
         ),
       });
       actionRef.current?.reload();
+      setImportModalOpen(false);
     } catch (error: any) {
       message.error(error?.data?.message || error?.message || '导入学生帐号失败');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res: any = await downloadStudentTemplate();
+      const url = window.URL.createObjectURL(res);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '学生导入模板.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success('模板已下载');
+    } catch {
+      message.error('下载模板失败');
     }
   };
 
@@ -336,19 +354,13 @@ const StudentPage: React.FC = () => {
                 </Button>,
               ]
             : []),
-          <Upload
+          <Button
             key="import-students"
-            accept=".xlsx,.xls"
-            showUploadList={false}
-            beforeUpload={(file) => {
-              handleImportStudents(file);
-              return false;
-            }}
+            icon={<UploadOutlined />}
+            onClick={() => setImportModalOpen(true)}
           >
-            <Button icon={<UploadOutlined />} loading={importing}>
-              导入学生
-            </Button>
-          </Upload>,
+            导入学生
+          </Button>,
           <Button
             key="reload"
             icon={<ReloadOutlined />}
@@ -425,6 +437,40 @@ const StudentPage: React.FC = () => {
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="批量导入学生"
+        open={importModalOpen}
+        onCancel={() => setImportModalOpen(false)}
+        footer={null}
+        width={480}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ marginBottom: 8 }}>上传Excel文件（.xlsx / .xls）：</p>
+          <p style={{ color: '#999', fontSize: 12 }}>
+            每行格式：学号 | 姓名 | 班级。初始密码为 123123，重复学号自动更新班级。
+          </p>
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={handleDownloadTemplate}
+          >
+            下载模板
+          </Button>
+        </div>
+        <Upload
+          accept=".xlsx,.xls"
+          showUploadList={false}
+          beforeUpload={(file) => {
+            handleImportStudents(file);
+            return false;
+          }}
+        >
+          <Button icon={<UploadOutlined />} type="primary" block loading={importing}>
+            选择文件并导入
+          </Button>
+        </Upload>
       </Modal>
     </>
   );

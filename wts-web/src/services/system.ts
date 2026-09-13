@@ -36,6 +36,11 @@ export async function importStudentUsers(file: File) {
   });
 }
 
+/** 下载学生导入模板 */
+export async function downloadStudentTemplate() {
+  return request.get('/users/import-template', { responseType: 'blob' });
+}
+
 /** 更新用户 */
 export async function updateUser(
   id: string,
