@@ -207,6 +207,17 @@ public class UserService {
             throw BizException.notFound("用户不存在");
         }
 
+        // 内置超级管理员的职位/权限不可修改（防止锁死或自降级）
+        if (SYSADMIN_LOGIN.equalsIgnoreCase(user.getLoginname())
+                && (StringUtils.hasText(dto.getPost()) || dto.getPerms() != null)) {
+            throw BizException.fail("系统管理员不允许修改职位与权限");
+        }
+        // 任何人不能修改自己的职位/权限（防止自升/自降级造成权限失控）
+        if (Objects.equals(id, operatorId)
+                && (StringUtils.hasText(dto.getPost()) || dto.getPerms() != null)) {
+            throw BizException.fail("不能修改自己的职位与权限");
+        }
+
         String now = LocalDateTime.now().format(FMT);
         if (StringUtils.hasText(dto.getName())) user.setName(dto.getName());
         if (StringUtils.hasText(dto.getType())) user.setType(dto.getType());

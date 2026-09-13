@@ -58,6 +58,11 @@ const UserPage: React.FC = () => {
   const canManage =
     isPlatformAdmin || String(currentUser?.perms || '').split(',').includes('USER_MANAGE');
 
+  // 编辑自己或内置系统管理员时锁定职位/权限字段
+  const isProtectedEdit =
+    (!!editingUser && editingUser?.id === currentUser?.id) ||
+    editingUser?.loginname === 'sysadmin';
+
   // 职位可选范围：平台管理员全量；主任/副主任可选 学生/教师/主任/副主任（不能建平台管理员）
   const postOptions = isPlatformAdmin
     ? POST_OPTIONS
@@ -469,9 +474,16 @@ const UserPage: React.FC = () => {
           <Form.Item
             name="post"
             label="职位"
-            tooltip={isPlatformAdmin ? '调整职位会同时按职位重算默认权限' : '仅可创建/调整本教研室范围内的职位（学生/教师/主任/副主任）'}
+            tooltip={
+              isProtectedEdit
+                ? '系统管理员不允许修改自己的职位与权限'
+                : isPlatformAdmin
+                  ? '调整职位会同时按职位重算默认权限'
+                  : '仅可创建/调整本教研室范围内的职位（学生/教师/主任/副主任）'
+            }
           >
             <Select
+              disabled={isProtectedEdit}
               options={postOptions}
               onChange={(value) => {
                 setSelectedPost(value);
@@ -482,6 +494,7 @@ const UserPage: React.FC = () => {
           {selectedPost !== 'student' && isPlatformAdmin && (
             <Form.Item name="perms" label="功能权限" tooltip="平台管理员全票通过，此处为教师的细粒度权限开关">
               <Checkbox.Group
+                disabled={isProtectedEdit}
                 options={PERM_OPTIONS.filter((o) => o.value !== 'USER_MANAGE')}
               />
             </Form.Item>

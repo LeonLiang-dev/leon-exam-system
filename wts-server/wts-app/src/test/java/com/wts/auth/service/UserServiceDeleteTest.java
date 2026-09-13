@@ -92,6 +92,48 @@ class UserServiceDeleteTest {
         verify(userMapper, never()).deleteBatchIds(any());
     }
 
+    @Test
+    void updateUserRejectsChangingOwnPostOrPerms() {
+        SysUser current = user("operator-1", "teacher1");
+        when(userMapper.selectById("operator-1")).thenReturn(current);
+
+        com.wts.auth.dto.UserDTO dto = new com.wts.auth.dto.UserDTO();
+        dto.setPost("director");
+        BizException error = assertThrows(BizException.class,
+                () -> service.updateUser("operator-1", dto, "operator-1"));
+
+        assertEquals("不能修改自己的职位与权限", error.getMessage());
+        verify(userMapper, never()).updateById(any(SysUser.class));
+    }
+
+    @Test
+    void updateUserRejectsChangingSysadminPostOrPerms() {
+        SysUser sysadmin = user("sysadmin-id", "sysadmin");
+        when(userMapper.selectById("sysadmin-id")).thenReturn(sysadmin);
+
+        com.wts.auth.dto.UserDTO dto = new com.wts.auth.dto.UserDTO();
+        dto.setPerms("CLASS_IMPORT");
+        BizException error = assertThrows(BizException.class,
+                () -> service.updateUser("sysadmin-id", dto, "operator-1"));
+
+        assertEquals("系统管理员不允许修改职位与权限", error.getMessage());
+        verify(userMapper, never()).updateById(any(SysUser.class));
+    }
+
+    @Test
+    void updateUserAllowsEditingOwnNonPermissionFields() {
+        SysUser current = user("operator-1", "teacher1");
+        when(userMapper.selectById("operator-1")).thenReturn(current);
+
+        com.wts.auth.dto.UserDTO dto = new com.wts.auth.dto.UserDTO();
+        dto.setName("新姓名");
+        dto.setComments("备注");
+        service.updateUser("operator-1", dto, "operator-1");
+
+        assertEquals("新姓名", current.getName());
+        verify(userMapper).updateById(current);
+    }
+
     private static SysUser user(String id, String loginName) {
         SysUser user = new SysUser();
         user.setId(id);
