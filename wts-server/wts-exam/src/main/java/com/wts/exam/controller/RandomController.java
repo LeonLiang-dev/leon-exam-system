@@ -94,6 +94,7 @@ public class RandomController {
                          @RequestParam(defaultValue = "1") int count) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.EXAM_PUBLISH.name());
-        return R.ok(service.generatePapers(itemId, count, user.id(), permissionService.visibleOwnerIds(user)));
+        // 题目全院共用：随机组卷从全院题库抽取
+        return R.ok(service.generatePapers(itemId, count, user.id(), null));
     }
 }

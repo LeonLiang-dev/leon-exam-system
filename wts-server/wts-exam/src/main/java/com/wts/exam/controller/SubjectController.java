@@ -34,7 +34,8 @@ public class SubjectController {
     public R<?> list(SubjectQueryDTO query) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.SUBJECT_MANAGE.name());
-        return R.ok(service.list(query, permissionService.visibleOwnerIds(user)));
+        // 题目全院共用：任何教职工可见全院题目（orgId 过滤仍生效），编辑/删除仍限创建者/主任/管理员
+        return R.ok(service.list(query, null));
     }
 
     @GetMapping("/{id}")
@@ -46,7 +47,6 @@ public class SubjectController {
         if (version == null) {
             throw BizException.notFound("题目版本");
         }
-        requireOwns(user, version.getCuser());
         var answers = service.getVersionAnswers(version.getId());
         java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("subject", subject);
@@ -85,6 +85,9 @@ public class SubjectController {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.SUBJECT_MANAGE.name());
         List<String> ids = dto.normalizedIds();
+        for (String id : ids) {
+            requireOwnsVersion(user, id);
+        }
         service.deleteBatch(ids, user.id());
         return R.ok();
     }
@@ -131,24 +134,21 @@ public class SubjectController {
         }
     }
 
-    /** 校验当前用户对该题目当前版本的归属（平台管理员不限） */
+    /** 校验当前用户对该题目当前版本的归属（创建者/主任/副主任/平台管理员可编辑删除） */
     private void requireOwnsVersion(CurrentUser user, String subjectId) {
         var version = service.getCurrentVersion(subjectId);
         if (version == null) {
             throw BizException.notFound("题目版本");
         }
-        requireOwns(user, version.getCuser());
+        requireEditor(user, version.getCuser());
     }
 
-    private void requireOwns(CurrentUser user, String ownerId) {
-        if (user.isPlatformAdmin()) {
+    /** 题目/试卷全院共用后，编辑/删除仅限创建者本人或教研室主任/平台管理员 */
+    private void requireEditor(CurrentUser user, String ownerId) {
+        if (user.isPlatformAdmin() || user.isDeptManager()) {
             return;
         }
-        List<String> scope = permissionService.visibleOwnerIds(user);
-        if (scope == null) {
-            return;
-        }
-        if (ownerId == null || !scope.contains(ownerId)) {
+        if (ownerId == null || !ownerId.equals(user.id())) {
             throw BizException.forbidden("只能操作自己创建的题目");
         }
     }

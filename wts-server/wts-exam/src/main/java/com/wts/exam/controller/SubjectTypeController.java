@@ -27,7 +27,8 @@ public class SubjectTypeController {
     @GetMapping("/tree")
     public R<?> tree() {
         CurrentUser user = currentUserProvider.require();
-        return R.ok(service.getTree(permissionService.visibleOwnerIds(user)));
+        // 题目全院共用，分类树同步全院可见；创建/编辑/删除仍按创建者范围校验
+        return R.ok(service.getTree(null));
     }
 
     @PostMapping

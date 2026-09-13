@@ -57,9 +57,9 @@ public class UserService {
     private static final String DEFAULT_STUDENT_PASSWORD = "123123";
 
     /**
-     * 用户分页列表
+     * 学生分页列表
      *
-     * @param scopeUserIds 可见用户 id 集合；null 表示不限制（平台管理员）
+     * @param scopeUserIds 可见用户 id 集合；null 表示不限制（学生全院共用时传入）
      */
     public PageResult<SysUser> listUsers(int page, int size, String keyword, String state,
                                          String post, String className, String orgId, List<String> scopeUserIds) {
@@ -118,6 +118,14 @@ public class UserService {
         result.getRecords().forEach(u -> u.setPassword(null));
         fillOrgInfo(result.getRecords());
         return PageResult.of(result);
+    }
+
+    /** 按 id 批量读取用户（供权限判定使用，不做任何写保护检查） */
+    public List<SysUser> listByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return userMapper.selectBatchIds(ids);
     }
 
     /** 批量填充用户组织归属 id 与名称（一次 IN 查询） */

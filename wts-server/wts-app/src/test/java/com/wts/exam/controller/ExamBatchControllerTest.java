@@ -5,6 +5,8 @@ import com.wts.common.security.CurrentUserProvider;
 import com.wts.common.security.LoginUserDetails;
 import com.wts.auth.service.PermissionService;
 import com.wts.exam.dto.BatchIdsDTO;
+import com.wts.exam.entity.ExamPaper;
+import com.wts.exam.entity.ExamSubjectVersion;
 import com.wts.exam.service.CardService;
 import com.wts.exam.service.PaperService;
 import com.wts.exam.service.RandomService;
@@ -87,6 +89,10 @@ class ExamBatchControllerTest {
     @Test
     void subjectBatchDeleteDelegatesNormalizedIds() {
         SubjectController controller = new SubjectController(subjectService, subjectImportService, currentUserProvider, permissionService);
+        ExamSubjectVersion version = new ExamSubjectVersion();
+        version.setCuser("admin-1");
+        when(subjectService.getCurrentVersion("subject-1")).thenReturn(version);
+        when(subjectService.getCurrentVersion("subject-2")).thenReturn(version);
 
         controller.batchDelete(batchIds(" subject-1 ", "subject-2", "subject-1"));
 
@@ -96,6 +102,10 @@ class ExamBatchControllerTest {
     @Test
     void paperBatchDeleteDelegatesNormalizedIds() {
         PaperController controller = new PaperController(paperService, currentUserProvider, permissionService);
+        ExamPaper paper = new ExamPaper();
+        paper.setCuser("admin-1");
+        when(paperService.getDetail("paper-1")).thenReturn(paper);
+        when(paperService.getDetail("paper-2")).thenReturn(paper);
 
         controller.batchDelete(batchIds(" paper-1 ", "paper-2", "paper-1"));
 

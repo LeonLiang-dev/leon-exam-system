@@ -24,9 +24,8 @@ const StudentPage: React.FC = () => {
   const isPlatformAdmin =
     currentUser?.post === 'platform_admin' || (currentUser?.type === '3' && !currentUser?.post);
 
-  // 可管理用户（主任/副主任/平台管理员）：显示全部管理操作；仅可导入的教师只显示导入按钮
-  const canManage =
-    isPlatformAdmin || String(currentUser?.perms || '').split(',').includes('USER_MANAGE');
+  // 学生全院共用：管理操作全员放开，任何教职工均可管理学生
+  const canManage = true;
 
   const actionRef = useRef<ActionType>();
   const proFormRef = useRef<ProFormInstance>();

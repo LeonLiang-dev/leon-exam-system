@@ -28,16 +28,15 @@ public class PaperController {
                      @RequestParam(required = false) String keyword) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.SUBJECT_MANAGE.name());
-        return R.ok(service.list(page, size, keyword, permissionService.visibleOwnerIds(user)));
+        // 试卷全院共用：任何教职工可见全院试卷用于发布考试，编辑/删除仍限创建者/主任/管理员
+        return R.ok(service.list(page, size, keyword, null));
     }
 
     @GetMapping("/{id}")
     public R<?> detail(@PathVariable String id) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.SUBJECT_MANAGE.name());
-        var paper = service.getDetail(id);
-        requireOwns(user, paper.getCuser());
-        return R.ok(paper);
+        return R.ok(service.getDetail(id));
     }
 
     @PostMapping
@@ -74,7 +73,6 @@ public class PaperController {
     public R<?> getChapters(@PathVariable String id) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.SUBJECT_MANAGE.name());
-        requireOwnsPaper(user, id);
         return R.ok(service.getChapters(id));
     }
 
@@ -82,7 +80,6 @@ public class PaperController {
     public R<?> getPaperSubjects(@PathVariable String id) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.SUBJECT_MANAGE.name());
-        requireOwnsPaper(user, id);
         return R.ok(service.getPaperSubjects(id));
     }
 
@@ -100,24 +97,24 @@ public class PaperController {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.SUBJECT_MANAGE.name());
         List<String> ids = dto.normalizedIds();
+        for (String id : ids) {
+            requireOwnsPaper(user, id);
+        }
         service.deleteBatch(ids, user.id());
         return R.ok();
     }
 
     private void requireOwnsPaper(CurrentUser user, String paperId) {
         var paper = service.getDetail(paperId);
-        requireOwns(user, paper.getCuser());
+        requireEditor(user, paper.getCuser());
     }
 
-    private void requireOwns(CurrentUser user, String ownerId) {
-        if (user.isPlatformAdmin()) {
+    /** 试卷全院共用后，编辑/删除仅限创建者本人或教研室主任/平台管理员 */
+    private void requireEditor(CurrentUser user, String ownerId) {
+        if (user.isPlatformAdmin() || user.isDeptManager()) {
             return;
         }
-        List<String> scope = permissionService.visibleOwnerIds(user);
-        if (scope == null) {
-            return;
-        }
-        if (ownerId == null || !scope.contains(ownerId)) {
+        if (ownerId == null || !ownerId.equals(user.id())) {
             throw BizException.forbidden("只能操作自己创建的试卷");
         }
     }

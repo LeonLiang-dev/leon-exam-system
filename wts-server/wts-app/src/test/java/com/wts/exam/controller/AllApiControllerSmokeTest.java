@@ -160,6 +160,9 @@ class AllApiControllerSmokeTest {
         when(userService.createUser(any(UserDTO.class), eq("admin-1"))).thenReturn(sysUser("user-1"));
         when(userService.importStudents(any(InputStream.class), eq("admin-1"))).thenReturn(new StudentImportResult());
         when(userService.updateUser(eq("user-1"), any(UserDTO.class), eq("admin-1"))).thenReturn(sysUser("user-1"));
+        SysUser staffTarget = sysUser("user-1");
+        staffTarget.setPost("teacher");
+        when(userService.listByIds(any())).thenReturn(List.of(staffTarget));
 
         assertOk(controller.list(1, 20, "kw", "1", null, null, null));
         assertOk(controller.create(new UserDTO()));
@@ -236,9 +239,11 @@ class AllApiControllerSmokeTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         when(subjectService.list(any(SubjectQueryDTO.class), isNull())).thenReturn(PageResult.of(List.of(new ExamSubject()), 1, 1, 20));
-        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
         when(subjectService.getDetail("subject-1")).thenReturn(new ExamSubject());
-        when(subjectService.getCurrentVersion("subject-1")).thenReturn(new ExamSubjectVersion());
+        ExamSubjectVersion subjectVersion = new ExamSubjectVersion();
+        subjectVersion.setCuser("admin-1");
+        when(subjectService.getCurrentVersion("subject-1")).thenReturn(subjectVersion);
+        when(subjectService.getCurrentVersion("subject-2")).thenReturn(subjectVersion);
         when(subjectService.create(any(SubjectDTO.class), eq("admin-1"), eq("Admin One"))).thenReturn(new ExamSubject());
         when(subjectImportService.importFromExcel(any(InputStream.class), eq("type-1"), eq("admin-1"), eq("Admin One")))
                 .thenReturn(Map.of("created", 1));
@@ -261,8 +266,10 @@ class AllApiControllerSmokeTest {
         PaperController controller = new PaperController(paperService, currentUserProvider, permissionService);
 
         when(paperService.list(1, 20, "paper", null)).thenReturn(PageResult.of(List.of(new ExamPaper()), 1, 1, 20));
-        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
-        when(paperService.getDetail("paper-1")).thenReturn(new ExamPaper());
+        ExamPaper ownedPaper = new ExamPaper();
+        ownedPaper.setCuser("admin-1");
+        when(paperService.getDetail("paper-1")).thenReturn(ownedPaper);
+        when(paperService.getDetail("paper-2")).thenReturn(ownedPaper);
         when(paperService.create(any(PaperDTO.class), eq("admin-1"), eq("Admin One"))).thenReturn(new ExamPaper());
         when(paperService.getChapters("paper-1")).thenReturn(List.of(new ExamPaperChapter()));
         when(paperService.getPaperSubjects("paper-1")).thenReturn(List.of(new ExamPaperSubject()));
@@ -356,7 +363,6 @@ class AllApiControllerSmokeTest {
         when(randomService.getSteps("item-1")).thenReturn(List.of(new ExamRandomStep()));
         when(randomService.addStep(eq("item-1"), any(RandomItemDTO.RandomStepDTO.class))).thenReturn(new ExamRandomStep());
         when(randomService.updateStep(eq("step-1"), any(RandomItemDTO.RandomStepDTO.class))).thenReturn(new ExamRandomStep());
-        when(permissionService.visibleOwnerIds(any())).thenReturn(null);
         when(randomService.generatePapers("item-1", 2, "admin-1", null)).thenReturn(List.of("paper-1", "paper-2"));
 
         assertOk(controller.listItems());
