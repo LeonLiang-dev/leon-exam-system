@@ -7,6 +7,7 @@ import com.wts.auth.mapper.SysUserorgMapper;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import java.io.InputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -132,6 +134,79 @@ class UserServiceStudentImportTest {
         assertEquals(3, result.getFailed());
         assertEquals(3, result.getErrors().size());
         verify(userMapper).insert(any(SysUser.class));
+    }
+
+    @Test
+    void downloadTemplateProducesWorkbookWithStudentAndGuideSheets() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        service.downloadTemplate(output);
+
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(output.toByteArray()))) {
+            assertEquals(2, workbook.getNumberOfSheets());
+            Sheet studentSheet = workbook.getSheetAt(0);
+            assertEquals("学生", studentSheet.getSheetName());
+            assertEquals("填写说明", workbook.getSheetAt(1).getSheetName());
+
+            // 表头与 importStudents 解析列一致：学号/姓名/班级
+            Row header = studentSheet.getRow(0);
+            assertEquals(3, header.getLastCellNum());
+            assertEquals("学号", header.getCell(0).getStringCellValue());
+            assertEquals("姓名", header.getCell(1).getStringCellValue());
+            assertEquals("班级", header.getCell(2).getStringCellValue());
+        }
+    }
+
+    @Test
+    void downloadTemplateGuideSheetContainsInstructions() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        service.downloadTemplate(output);
+
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(output.toByteArray()))) {
+            Sheet guide = workbook.getSheet("填写说明");
+            assertNotNull(guide);
+            StringBuilder lines = new StringBuilder();
+            for (int i = 0; i <= guide.getLastRowNum(); i++) {
+                lines.append(guide.getRow(i).getCell(0).getStringCellValue());
+            }
+            assertTrue(lines.toString().contains("填写说明"));
+            assertTrue(lines.toString().contains("初始密码为 123123"));
+            assertTrue(lines.toString().contains("从第2行开始填写"));
+        }
+    }
+
+    @Test
+    void generatedTemplateCanBeFilledThenImported() throws Exception {
+        when(userMapper.selectOne(any())).thenReturn(null);
+        when(passwordEncoder.encode("123123")).thenReturn("encoded-123123");
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        service.downloadTemplate(output);
+
+        // 在模板「学生」Sheet 第2行补一条数据后按导入流程读取，验证模板表头与解析列一致
+        byte[] bytes;
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(output.toByteArray()));
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.getSheetAt(0);
+            Row row = sheet.createRow(1);
+            row.createCell(0).setCellValue("2024099");
+            row.createCell(1).setCellValue("模板测试");
+            row.createCell(2).setCellValue("软件2401");
+            workbook.write(out);
+            bytes = out.toByteArray();
+        }
+
+        StudentImportResult result = service.importStudents(new ByteArrayInputStream(bytes), "teacher-1");
+
+        assertEquals(1, result.getTotal());
+        assertEquals(1, result.getCreated());
+        assertEquals(0, result.getFailed());
+        ArgumentCaptor<SysUser> captor = ArgumentCaptor.forClass(SysUser.class);
+        verify(userMapper).insert(captor.capture());
+        SysUser user = captor.getValue();
+        assertEquals("2024099", user.getLoginname());
+        assertEquals("模板测试", user.getName());
+        assertEquals("软件2401", user.getClassName());
+        assertEquals("软件2401", user.getComments());
     }
 
     private static InputStream workbook(String[]... rows) {

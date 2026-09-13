@@ -62,11 +62,15 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -170,6 +174,20 @@ class AllApiControllerSmokeTest {
 
         verify(userService).disableUsers(List.of("user-1", "user-2"), "admin-1");
         verify(userService).hardDeleteUsers(List.of("user-1", "user-2"), "admin-1");
+    }
+
+    @Test
+    void userTemplateDownloadEndpointIsCallable() throws Exception {
+        UserController controller = new UserController(userService, permissionService, currentUserProvider);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.downloadTemplate(response);
+
+        assertEquals(200, response.getStatus());
+        assertEquals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", response.getContentType());
+        assertTrue(response.getHeader("Content-Disposition")
+                .contains("filename=" + URLEncoder.encode("学生导入模板.xlsx", StandardCharsets.UTF_8)));
+        verify(userService).downloadTemplate(any(OutputStream.class));
     }
 
     @Test
