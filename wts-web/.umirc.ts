@@ -104,9 +104,14 @@ export default defineConfig({
       access: 'canImport',
       routes: [
         {
-          name: '用户管理',
+          name: '教师管理',
           path: '/system/user',
           component: './System/User',
+        },
+        {
+          name: '学生管理',
+          path: '/system/student',
+          component: './System/Student',
         },
         {
           name: '组织机构',

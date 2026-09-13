@@ -72,7 +72,14 @@ public class UserService {
             wrapper.eq(SysUser::getState, state);
         }
         if (StringUtils.hasText(post)) {
-            wrapper.eq(SysUser::getPost, post);
+            // 支持逗号分隔多职位（如 teacher,director,deputy → in）
+            String[] posts = post.split(",");
+            if (posts.length == 1) {
+                wrapper.eq(SysUser::getPost, posts[0].trim());
+            } else {
+                wrapper.in(SysUser::getPost, java.util.Arrays.stream(posts)
+                        .map(String::trim).filter(StringUtils::hasText).toList());
+            }
         }
         if (StringUtils.hasText(className)) {
             wrapper.like(SysUser::getClassName, className);
