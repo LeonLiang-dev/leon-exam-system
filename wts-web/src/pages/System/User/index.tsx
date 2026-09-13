@@ -304,28 +304,40 @@ const UserPage: React.FC = () => {
   ];
 
   const handleOk = async () => {
-    const values = await form.validateFields();
-    const payload = {
-      name: values.name,
-      loginname: values.loginname,
-      post: values.post,
-      // platform_admin 的 perms 传空 = 全部权限
-      perms: values.post === 'platform_admin' ? '' : (values.perms || []).join(','),
-      orgId: values.orgId,
-      className: values.className,
-      comments: values.comments,
-    };
-    if (editingUser) {
-      await updateUser(editingUser.id, payload);
-      message.success('更新成功');
-    } else {
-      await createUser(payload as any);
-      message.success('创建成功，初始密码为 123456');
+    try {
+      const values = await form.validateFields();
+      const isSelfOrSysadminEdit =
+        !!editingUser &&
+        (editingUser.id === currentUser?.id || editingUser.loginname === 'sysadmin');
+      const payload = {
+        name: values.name,
+        loginname: values.loginname,
+        orgId: values.orgId,
+        className: values.className,
+        comments: values.comments,
+        // 受保护编辑（自己/sysadmin）不允许携带职位与权限，避免触发后端拦截
+        ...(isSelfOrSysadminEdit
+          ? {}
+          : {
+              post: values.post,
+              // platform_admin 的 perms 传空 = 全部权限
+              perms: values.post === 'platform_admin' ? '' : (values.perms || []).join(','),
+            }),
+      };
+      if (editingUser) {
+        await updateUser(editingUser.id, payload);
+        message.success('更新成功');
+      } else {
+        await createUser(payload as any);
+        message.success('创建成功，初始密码为 123456');
+      }
+      setModalOpen(false);
+      form.resetFields();
+      setEditingUser(null);
+      actionRef.current?.reload();
+    } catch (error: any) {
+      message.error(error?.data?.message || error?.message || '操作失败');
     }
-    setModalOpen(false);
-    form.resetFields();
-    setEditingUser(null);
-    actionRef.current?.reload();
   };
 
   const handleImportStudents = async (file: File) => {
