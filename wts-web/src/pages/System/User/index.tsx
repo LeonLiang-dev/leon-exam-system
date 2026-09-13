@@ -515,7 +515,7 @@ const UserPage: React.FC = () => {
               />
             </Form.Item>
           )}
-          <Form.Item name="orgId" label="组织归属" tooltip="选择教研组（主任/副主任选教研室，教师选对应教师分组）">
+          <Form.Item name="orgId" label="组织归属" tooltip="教职工直接归属到所在教研室（平台管理员归属默认组织，学生可不选）">
             <TreeSelect
               treeData={orgTree}
               treeDefaultExpandAll
