@@ -116,6 +116,21 @@ public class SubjectController {
         }
     }
 
+    @GetMapping("/template")
+    public void downloadTemplate(HttpServletResponse response) {
+        CurrentUser user = currentUserProvider.require();
+        permissionService.require(user, Permission.SUBJECT_MANAGE.name());
+        try {
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition",
+                    "attachment; filename=" + URLEncoder.encode("题目导入模板.xlsx", StandardCharsets.UTF_8));
+            importService.downloadTemplate(response.getOutputStream());
+            response.getOutputStream().flush();
+        } catch (Exception e) {
+            throw BizException.fail("下载模板失败: " + e.getMessage());
+        }
+    }
+
     /** 校验当前用户对该题目当前版本的归属（平台管理员不限） */
     private void requireOwnsVersion(CurrentUser user, String subjectId) {
         var version = service.getCurrentVersion(subjectId);

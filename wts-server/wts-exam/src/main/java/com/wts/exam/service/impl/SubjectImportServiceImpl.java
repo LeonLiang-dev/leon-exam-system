@@ -326,6 +326,48 @@ public class SubjectImportServiceImpl implements SubjectImportService {
         }
     }
 
+    @Override
+    public void downloadTemplate(OutputStream stream) {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet selectSheet = workbook.createSheet("选择题");
+            Sheet judgeSheet = workbook.createSheet("判断题");
+            Sheet vacancySheet = workbook.createSheet("填空题");
+            Sheet essaySheet = workbook.createSheet("问答题");
+            Sheet guideSheet = workbook.createSheet("填写说明");
+
+            // 表头与导入解析列完全一致
+            createHeaderRow(selectSheet, workbook, "题型", "题目描述", "选项A", "选项B", "选项C", "选项D", "选项E", "选项F", "答案", "难度");
+            createHeaderRow(judgeSheet, workbook, "题型", "题目描述", "答案", "难度");
+            createHeaderRow(vacancySheet, workbook, "题型", "题目描述", "空1答案", "空2答案", "空3答案", "空4答案", "空5答案", "空6答案", "难度");
+            createHeaderRow(essaySheet, workbook, "题型", "题目描述", "难度");
+
+            // 填写说明放独立 Sheet，导入仅读取前 4 个 Sheet，不会误导入
+            String[] guideLines = {
+                    "模板填写说明",
+                    "1.【选择题】题型填“单选”或“多选”；选项A~F填选项内容；答案列填正确选项序号（1=选项A，多个用逗号分隔，如 1,3）；难度填1~3",
+                    "2.【判断题】题型填“判断”；答案列填“对”或“错”；难度填1~3",
+                    "3.【填空题】题型填“填空”；空1~空6填各空标准答案（同一空多个写法用 | 分隔）；难度填1~3",
+                    "4.【问答题】题型填“问答”；仅填题目描述与难度",
+                    "5. 每个数据Sheet从第2行开始填写，题目描述不能为空；本说明Sheet不会导入",
+            };
+            for (int i = 0; i < guideLines.length; i++) {
+                guideSheet.createRow(i).createCell(0).setCellValue(guideLines[i]);
+            }
+            guideSheet.setColumnWidth(0, 60 * 256);
+
+            for (int i = 0; i < workbook.getNumberOfSheets() - 1; i++) {
+                Sheet sheet = workbook.getSheetAt(i);
+                for (int j = 0; j < sheet.getRow(0).getLastCellNum(); j++) {
+                    sheet.autoSizeColumn(j);
+                }
+            }
+
+            workbook.write(stream);
+        } catch (IOException e) {
+            throw com.wts.common.exception.BizException.fail("生成模板失败: " + e.getMessage());
+        }
+    }
+
     private String getStringCell(Row row, int col) {
         Cell cell = row.getCell(col);
         if (cell == null) return null;

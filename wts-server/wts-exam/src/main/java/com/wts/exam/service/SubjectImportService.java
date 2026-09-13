@@ -10,4 +10,7 @@ public interface SubjectImportService {
 
     /** Export all active subjects to Excel. */
     void exportToExcel(OutputStream stream);
+
+    /** Generate an empty import template (4 sheets with headers). */
+    void downloadTemplate(OutputStream stream);
 }

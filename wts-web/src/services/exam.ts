@@ -88,6 +88,11 @@ export async function exportSubjects() {
   return request.get('/subjects/export', { responseType: 'blob' });
 }
 
+/** 下载题目导入模板 */
+export async function downloadSubjectTemplate() {
+  return request.get('/subjects/template', { responseType: 'blob' });
+}
+
 // ==================== 试卷 ====================
 
 /** 试卷列表 */

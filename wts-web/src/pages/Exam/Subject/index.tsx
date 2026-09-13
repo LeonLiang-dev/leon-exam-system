@@ -21,6 +21,7 @@ import {
   getSubjectTypeTree,
   importSubjects,
   exportSubjects,
+  downloadSubjectTemplate,
 } from '@/services/exam';
 import { getOrganizationTree } from '@/services/system';
 
@@ -674,6 +675,26 @@ const SubjectPage: React.FC = () => {
             Excel模板包含4个Sheet：选择题、判断题、填空题、主观题。
             每行格式：TYPE | TEXT | RIGHT1~6 | RIGHT | ...
           </p>
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={async () => {
+              try {
+                const res: any = await downloadSubjectTemplate();
+                const url = window.URL.createObjectURL(res);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '题目导入模板.xlsx';
+                a.click();
+                window.URL.revokeObjectURL(url);
+                message.success('模板已下载');
+              } catch {
+                message.error('下载模板失败');
+              }
+            }}
+          >
+            下载模板
+          </Button>
         </div>
         <Upload
           accept=".xlsx,.xls"
