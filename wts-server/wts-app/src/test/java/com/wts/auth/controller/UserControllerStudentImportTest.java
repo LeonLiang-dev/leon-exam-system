@@ -2,6 +2,7 @@ package com.wts.auth.controller;
 
 import com.wts.auth.dto.BatchIdsDTO;
 import com.wts.auth.dto.StudentImportResult;
+import com.wts.auth.entity.SysUser;
 import com.wts.auth.mapper.SysOrganizationMapper;
 import com.wts.auth.mapper.SysUserMapper;
 import com.wts.auth.mapper.SysUserorgMapper;
@@ -110,6 +111,42 @@ class UserControllerStudentImportTest {
                 () -> controller.list(1, 20, null, null, null, null, null));
 
         assertEquals(403, error.getCode());
+    }
+
+    @Test
+    void directorCannotSetAnotherUserAsDirector() {
+        authenticate("director-1", "director", Set.of("USER_MANAGE"));
+        com.wts.auth.dto.UserDTO dto = new com.wts.auth.dto.UserDTO();
+        dto.setPost("director");
+
+        BizException error = assertThrows(BizException.class, () -> controller.create(dto));
+
+        assertEquals(403, error.getCode());
+        verify(userService, never()).createUser(any(), any());
+    }
+
+    @Test
+    void directorCannotSetPlatformAdmin() {
+        authenticate("director-1", "director", Set.of("USER_MANAGE"));
+        com.wts.auth.dto.UserDTO dto = new com.wts.auth.dto.UserDTO();
+        dto.setPost("platform_admin");
+
+        BizException error = assertThrows(BizException.class, () -> controller.create(dto));
+
+        assertEquals(403, error.getCode());
+        verify(userService, never()).createUser(any(), any());
+    }
+
+    @Test
+    void directorCanPromoteTeacherToDeputy() {
+        authenticate("director-1", "director", Set.of("USER_MANAGE"));
+        com.wts.auth.dto.UserDTO dto = new com.wts.auth.dto.UserDTO();
+        dto.setPost("deputy");
+        when(userService.createUser(any(), eq("director-1"))).thenReturn(new SysUser());
+
+        controller.create(dto);
+
+        verify(userService).createUser(dto, "director-1");
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.wts.auth.dto.BatchIdsDTO;
 import com.wts.auth.dto.UserDTO;
 import com.wts.auth.entity.SysUser;
 import com.wts.auth.enums.Permission;
+import com.wts.auth.enums.UserPost;
 import com.wts.auth.service.PermissionService;
 import com.wts.auth.service.UserService;
 import com.wts.common.exception.BizException;
@@ -51,6 +52,7 @@ public class UserController {
     public R<SysUser> create(@RequestBody UserDTO dto) {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.USER_MANAGE.name());
+        ensurePostAllowed(user, dto.getPost());
         ensureOrgAllowed(user, dto.getOrgId());
         SysUser created = userService.createUser(dto, user.id());
         return R.ok(created);
@@ -75,6 +77,7 @@ public class UserController {
         CurrentUser user = currentUserProvider.require();
         permissionService.require(user, Permission.USER_MANAGE.name());
         permissionService.ensureTargetsInScope(user, List.of(id));
+        ensurePostAllowed(user, dto.getPost());
         ensureOrgAllowed(user, dto.getOrgId());
         SysUser updated = userService.updateUser(id, dto, user.id());
         return R.ok(updated);
@@ -130,6 +133,19 @@ public class UserController {
         CurrentUser user = currentUserProvider.require();
         userService.changePassword(user.id(), body.get("oldPassword"), body.get("newPassword"));
         return R.ok();
+    }
+
+    /** 职位调整范围校验：非平台管理员只能设 学生/教师/副主任，不能设 主任/平台管理员 */
+    private void ensurePostAllowed(CurrentUser user, String post) {
+        if (user.isPlatformAdmin() || post == null || post.isBlank()) {
+            return;
+        }
+        if (UserPost.DIRECTOR.code().equals(post)) {
+            throw BizException.forbidden("只有平台管理员可以设置主任");
+        }
+        if (UserPost.PLATFORM_ADMIN.code().equals(post)) {
+            throw BizException.forbidden("无权设置平台管理员");
+        }
     }
 
     /** 组织归属校验：非平台管理员只能将用户分配到自己可见的组织节点下 */

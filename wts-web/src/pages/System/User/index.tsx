@@ -58,10 +58,10 @@ const UserPage: React.FC = () => {
   const canManage =
     isPlatformAdmin || String(currentUser?.perms || '').split(',').includes('USER_MANAGE');
 
-  // 职位可选范围：平台管理员全量；主任/副主任可选 学生/教师/主任/副主任（不能建平台管理员）
+  // 职位可选范围：平台管理员全量；主任/副主任可选 学生/教师/副主任（不能设主任/平台管理员）
   const postOptions = isPlatformAdmin
     ? POST_OPTIONS
-    : POST_OPTIONS.filter((o) => o.value !== 'platform_admin');
+    : POST_OPTIONS.filter((o) => o.value !== 'platform_admin' && o.value !== 'director');
 
   const actionRef = useRef<ActionType>();
   const proFormRef = useRef<ProFormInstance>();
@@ -320,8 +320,16 @@ const UserPage: React.FC = () => {
           ? {}
           : {
               post: values.post,
-              // platform_admin 的 perms 传空 = 全部权限
-              perms: values.post === 'platform_admin' ? '' : (values.perms || []).join(','),
+              // platform_admin 的 perms 传空 = 全部权限；主任/副主任自动附带用户管理权限
+              perms:
+                values.post === 'platform_admin'
+                  ? ''
+                  : [
+                      ...(values.post === 'director' || values.post === 'deputy'
+                        ? ['USER_MANAGE']
+                        : []),
+                      ...(values.perms || []),
+                    ].join(','),
             }),
       };
       if (editingUser) {
@@ -507,8 +515,8 @@ const UserPage: React.FC = () => {
               }}
             />
           </Form.Item>
-          {selectedPost !== 'student' && isPlatformAdmin && (
-            <Form.Item name="perms" label="功能权限" tooltip="平台管理员全票通过，此处为教师的细粒度权限开关">
+          {selectedPost !== 'student' && canManage && (
+            <Form.Item name="perms" label="功能权限" tooltip="用户管理权限由职位决定（主任/副主任自动拥有），此处为其他功能权限开关">
               <Checkbox.Group
                 disabled={isProtectedEdit}
                 options={PERM_OPTIONS.filter((o) => o.value !== 'USER_MANAGE')}
