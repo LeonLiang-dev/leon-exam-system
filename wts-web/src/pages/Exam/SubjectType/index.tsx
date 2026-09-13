@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { App, Card, Tree, Button, Modal, Form, Input, InputNumber, Space, Popconfirm, Empty, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { App, Card, Button, Modal, Form, Input, InputNumber, Space, Popconfirm, Table, Tag } from 'antd';
+import { PlusOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   getSubjectTypeTree,
   createSubjectType,
@@ -11,21 +11,21 @@ import {
 
 const SubjectTypePage: React.FC = () => {
   const { message } = App.useApp();
-  const [treeData, setTreeData] = useState<any[]>([]);
+  const [typeList, setTypeList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
-  const [parentId, setParentId] = useState<string | null>(null);
-  const [checkedTypeKeys, setCheckedTypeKeys] = useState<string[]>([]);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [form] = Form.useForm();
 
-  const loadTree = async () => {
+  const loadTypes = async () => {
     try {
       setLoading(true);
       const res: any = await getSubjectTypeTree();
-      setTreeData(res.data || []);
-      setCheckedTypeKeys([]);
+      // 分类为按课程展开的一层结构，直接平铺展示
+      setTypeList(res.data || []);
+      setSelectedRowKeys([]);
     } catch {
       message.error('加载分类失败');
     } finally {
@@ -33,56 +33,20 @@ const SubjectTypePage: React.FC = () => {
     }
   };
 
-  useEffect(() => { loadTree(); }, []);
+  useEffect(() => { loadTypes(); }, []);
 
-  const convertToTreeData = (nodes: any[]): any[] =>
-    nodes.map((t: any) => ({
-      title: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>{t.name}</span>
-          {t.orgName && <Tag color="purple">{t.orgName}</Tag>}
-          <Tag>{t.children?.length || 0} 子分类</Tag>
-          <PlusOutlined
-            title="新增子分类"
-            style={{ color: '#52c41a', fontSize: 12 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditingType(null);
-              setParentId(t.id);
-              form.resetFields();
-              form.setFieldsValue({ sort: 1 });
-              setModalOpen(true);
-            }}
-          />
-          <EditOutlined
-            style={{ color: '#1890ff', fontSize: 12 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditingType(t);
-              setParentId(null);
-              form.setFieldsValue({ name: t.name, comments: t.comments, sort: t.sort });
-              setModalOpen(true);
-            }}
-          />
-          <Popconfirm
-            title="确定删除此分类？"
-            onConfirm={async (e) => {
-              e?.stopPropagation();
-              await deleteSubjectType(t.id);
-              message.success('已删除');
-              loadTree();
-            }}
-          >
-            <DeleteOutlined
-              style={{ color: '#ff4d4f', fontSize: 12 }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </Popconfirm>
-        </div>
-      ),
-      key: t.id,
-      children: t.children?.length ? convertToTreeData(t.children) : undefined,
-    }));
+  const openCreate = () => {
+    setEditingType(null);
+    form.resetFields();
+    form.setFieldsValue({ sort: 1 });
+    setModalOpen(true);
+  };
+
+  const openEdit = (record: any) => {
+    setEditingType(record);
+    form.setFieldsValue({ name: record.name, comments: record.comments, sort: record.sort });
+    setModalOpen(true);
+  };
 
   const handleOk = async () => {
     const values = await form.validateFields();
@@ -91,42 +55,88 @@ const SubjectTypePage: React.FC = () => {
         await updateSubjectType(editingType.id, values);
         message.success('更新成功');
       } else {
-        await createSubjectType({ ...values, parentid: parentId || 'NONE' });
+        // 分类不做主从分支，全部为一级课程分类
+        await createSubjectType({ ...values, parentid: 'NONE' });
         message.success('创建成功');
       }
       setModalOpen(false);
       form.resetFields();
       setEditingType(null);
-      setParentId(null);
-      loadTree();
+      loadTypes();
     } catch {
       message.error('操作失败');
     }
   };
 
   const handleBatchDelete = () => {
-    if (checkedTypeKeys.length === 0) {
+    if (selectedRowKeys.length === 0) {
       message.warning('请先选择分类');
       return;
     }
     Modal.confirm({
-      title: `确定删除选中的 ${checkedTypeKeys.length} 个分类？`,
-      content: '删除分类会让该分类从题目分类树中隐藏。',
+      title: `确定删除选中的 ${selectedRowKeys.length} 个分类？`,
+      content: '删除分类会让该分类从题目分类列表中隐藏。',
       okText: '删除',
       cancelText: '取消',
       okButtonProps: { danger: true },
       onOk: async () => {
         setBatchDeleting(true);
         try {
-          await batchDeleteSubjectTypes(checkedTypeKeys);
+          await batchDeleteSubjectTypes(selectedRowKeys);
           message.success('批量删除成功');
-          loadTree();
+          loadTypes();
         } finally {
           setBatchDeleting(false);
         }
       },
     });
   };
+
+  const columns = [
+    {
+      title: '分类名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string, record: any) => (
+        <Space>
+          <span>{name}</span>
+          {record.orgName && <Tag color="purple">{record.orgName}</Tag>}
+        </Space>
+      ),
+    },
+    {
+      title: '排序',
+      dataIndex: 'sort',
+      key: 'sort',
+      width: 100,
+    },
+    {
+      title: '说明',
+      dataIndex: 'comments',
+      key: 'comments',
+      ellipsis: true,
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 160,
+      render: (_: any, record: any) => (
+        <Space>
+          <a onClick={() => openEdit(record)}>编辑</a>
+          <Popconfirm
+            title="确定删除此分类？"
+            onConfirm={async () => {
+              await deleteSubjectType(record.id);
+              message.success('已删除');
+              loadTypes();
+            }}
+          >
+            <a style={{ color: '#ff4d4f' }}>删除</a>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -137,54 +147,45 @@ const SubjectTypePage: React.FC = () => {
             <Button
               danger
               icon={<DeleteOutlined />}
-              disabled={checkedTypeKeys.length === 0}
+              disabled={selectedRowKeys.length === 0}
               loading={batchDeleting}
               onClick={handleBatchDelete}
             >
               批量删除
             </Button>
             <Button
-              icon={<PlusOutlined />}
-              type="primary"
-              onClick={() => {
-                setEditingType(null);
-                setParentId(null);
-                form.resetFields();
-                form.setFieldsValue({ sort: 1 });
-                setModalOpen(true);
-              }}
+              icon={<ReloadOutlined />}
+              onClick={loadTypes}
             >
-              新建根分类
+              刷新
+            </Button>
+            <Button icon={<PlusOutlined />} type="primary" onClick={openCreate}>
+              新建分类
             </Button>
           </Space>
         }
       >
-        {treeData.length === 0 && !loading ? (
-          <Empty description="暂无分类，点击上方按钮新建" />
-        ) : (
-          <Tree
-            checkable
-            showLine
-            defaultExpandAll
-            checkedKeys={checkedTypeKeys}
-            onCheck={(keys) => {
-              const nextKeys = Array.isArray(keys) ? keys : keys.checked;
-              setCheckedTypeKeys(nextKeys.map(String));
-            }}
-            treeData={convertToTreeData(treeData)}
-          />
-        )}
+        <Table
+          rowKey="id"
+          loading={loading}
+          dataSource={typeList}
+          columns={columns}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys.map(String)),
+          }}
+          pagination={typeList.length > 10 ? { pageSize: 10, showSizeChanger: true } : false}
+        />
       </Card>
 
       <Modal
-        title={editingType ? '编辑分类' : parentId ? '新建子分类' : '新建根分类'}
+        title={editingType ? '编辑分类' : '新建分类'}
         open={modalOpen}
         onOk={handleOk}
         onCancel={() => {
           setModalOpen(false);
           form.resetFields();
           setEditingType(null);
-          setParentId(null);
         }}
       >
         <Form form={form} layout="vertical">
