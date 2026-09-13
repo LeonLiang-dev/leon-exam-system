@@ -29,12 +29,15 @@ export default function access(initialState: { currentUser?: any }) {
   const isStudent = !isStaff;
   // 用户管理权限（主任/副主任/平台管理员）
   const canManage = isPlatformAdmin || perms.includes('USER_MANAGE');
+  // 班级导入权限（所有教师默认具备），可进入用户页但仅限导入
+  const canImport = isPlatformAdmin || perms.includes('CLASS_IMPORT');
 
   return {
     isAdmin,
     isStaff,
     isStudent,
     canManage,
+    canImport,
     hasPerm: (p: string) => isPlatformAdmin || perms.includes(p),
   };
 }

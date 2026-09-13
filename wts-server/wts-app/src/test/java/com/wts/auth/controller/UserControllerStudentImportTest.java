@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -90,6 +91,25 @@ class UserControllerStudentImportTest {
 
         assertEquals(403, error.getCode());
         verify(userService, never()).importStudents(any(), any());
+    }
+
+    @Test
+    void teacherCanListUsersWithClassImportPermission() {
+        authenticate("teacher-1", "teacher", Set.of("CLASS_IMPORT"));
+
+        controller.list(1, 20, "kw", "1", null, null, null);
+
+        verify(userService).listUsers(eq(1), eq(20), eq("kw"), eq("1"), isNull(), isNull(), isNull(), any());
+    }
+
+    @Test
+    void studentCannotListUsers() {
+        authenticate("student-1", "student", Set.of());
+
+        BizException error = assertThrows(BizException.class,
+                () -> controller.list(1, 20, null, null, null, null, null));
+
+        assertEquals(403, error.getCode());
     }
 
     @Test

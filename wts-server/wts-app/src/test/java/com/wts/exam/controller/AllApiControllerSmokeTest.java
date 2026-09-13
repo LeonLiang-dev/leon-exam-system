@@ -384,6 +384,7 @@ class AllApiControllerSmokeTest {
         details.setLoginName(loginName);
         details.setName(name);
         details.setUserType(userType);
+        details.setPermissions(java.util.Set.of("USER_MANAGE", "CLASS_IMPORT"));
         return details;
     }
 

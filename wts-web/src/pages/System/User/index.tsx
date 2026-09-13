@@ -54,6 +54,10 @@ const UserPage: React.FC = () => {
   const isPlatformAdmin =
     currentUser?.post === 'platform_admin' || (currentUser?.type === '3' && !currentUser?.post);
 
+  // 可管理用户（主任/副主任/平台管理员）：显示全部管理操作；仅可导入的教师隐藏管理按钮
+  const canManage =
+    isPlatformAdmin || String(currentUser?.perms || '').split(',').includes('USER_MANAGE');
+
   // 职位可选范围：平台管理员全量；主任/副主任可选 学生/教师/主任/副主任（不能建平台管理员）
   const postOptions = isPlatformAdmin
     ? POST_OPTIONS
@@ -252,6 +256,7 @@ const UserPage: React.FC = () => {
       title: '操作',
       valueType: 'option',
       width: 280,
+      hideInTable: !canManage,
       render: (_, record) => (
         <Space>
           <a onClick={() => openEdit(record)}>编辑</a>
@@ -356,33 +361,37 @@ const UserPage: React.FC = () => {
         rowKey="id"
         search={{ labelWidth: 80 }}
         toolBarRender={() => [
-          <Button
-            key="add"
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => openEdit()}
-          >
-            新建用户
-          </Button>,
-          <Button
-            key="batch-disable"
-            icon={<StopOutlined />}
-            disabled={selectedRowKeys.length === 0}
-            loading={batchOperating}
-            onClick={batchDisableSelected}
-          >
-            批量禁用
-          </Button>,
-          <Button
-            key="batch-delete"
-            danger
-            icon={<DeleteOutlined />}
-            disabled={selectedRowKeys.length === 0}
-            loading={batchOperating}
-            onClick={batchHardDeleteSelected}
-          >
-            批量删除
-          </Button>,
+          ...(canManage
+            ? [
+                <Button
+                  key="add"
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => openEdit()}
+                >
+                  新建用户
+                </Button>,
+                <Button
+                  key="batch-disable"
+                  icon={<StopOutlined />}
+                  disabled={selectedRowKeys.length === 0}
+                  loading={batchOperating}
+                  onClick={batchDisableSelected}
+                >
+                  批量禁用
+                </Button>,
+                <Button
+                  key="batch-delete"
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={selectedRowKeys.length === 0}
+                  loading={batchOperating}
+                  onClick={batchHardDeleteSelected}
+                >
+                  批量删除
+                </Button>,
+              ]
+            : []),
           <Upload
             key="import-students"
             accept=".xlsx,.xls"
@@ -421,10 +430,14 @@ const UserPage: React.FC = () => {
           };
         }}
         formRef={proFormRef}
-        rowSelection={{
-          selectedRowKeys,
-          onChange: setSelectedRowKeys,
-        }}
+        rowSelection={
+          canManage
+            ? {
+                selectedRowKeys,
+                onChange: setSelectedRowKeys,
+              }
+            : false
+        }
         columns={columns}
       />
 

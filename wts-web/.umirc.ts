@@ -101,7 +101,7 @@ export default defineConfig({
       name: '系统管理',
       path: '/system',
       icon: 'SettingOutlined',
-      access: 'canManage',
+      access: 'canImport',
       routes: [
         {
           name: '用户管理',
@@ -112,6 +112,7 @@ export default defineConfig({
           name: '组织机构',
           path: '/system/organization',
           component: './System/Organization',
+          access: 'canManage',
         },
       ],
     },

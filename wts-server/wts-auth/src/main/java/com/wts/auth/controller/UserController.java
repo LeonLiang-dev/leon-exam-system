@@ -40,7 +40,8 @@ public class UserController {
             @RequestParam(required = false) String className,
             @RequestParam(required = false) String orgId) {
         CurrentUser user = currentUserProvider.require();
-        permissionService.require(user, Permission.USER_MANAGE.name());
+        // 用户管理（主任/管理员）或可导入班级（所有教师）均可进入用户列表，各自范围由 visibleUserIds 限定
+        requireManageOrImport(user);
         PageResult<SysUser> result = userService.listUsers(
                 page, size, keyword, state, post, className, orgId, permissionService.visibleUserIds(user));
         return R.ok(result);
@@ -143,6 +144,13 @@ public class UserController {
         Set<String> allowed = Set.copyOf(visibleOrgs);
         if (!allowed.contains(orgId)) {
             throw BizException.forbidden("目标组织不在你的管理范围内");
+        }
+    }
+
+    /** 用户管理（主任/管理员）或班级导入（所有教师）任一权限即可进入用户列表 */
+    private void requireManageOrImport(CurrentUser user) {
+        if (!user.hasPerm(Permission.USER_MANAGE.name()) && !user.hasPerm(Permission.CLASS_IMPORT.name())) {
+            throw BizException.forbidden("无权操作");
         }
     }
 }
