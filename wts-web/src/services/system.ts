@@ -8,6 +8,7 @@ export async function getUsers(params?: {
   state?: string;
   post?: string;
   className?: string;
+  orgId?: string;
 }) {
   return request.get('/users', { params });
 }

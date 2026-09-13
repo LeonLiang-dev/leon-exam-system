@@ -58,11 +58,6 @@ const UserPage: React.FC = () => {
   const canManage =
     isPlatformAdmin || String(currentUser?.perms || '').split(',').includes('USER_MANAGE');
 
-  // 编辑自己或内置系统管理员时锁定职位/权限字段
-  const isProtectedEdit =
-    (!!editingUser && editingUser?.id === currentUser?.id) ||
-    editingUser?.loginname === 'sysadmin';
-
   // 职位可选范围：平台管理员全量；主任/副主任可选 学生/教师/主任/副主任（不能建平台管理员）
   const postOptions = isPlatformAdmin
     ? POST_OPTIONS
@@ -78,6 +73,11 @@ const UserPage: React.FC = () => {
   const [orgTree, setOrgTree] = useState<any[]>([]);
   const [selectedPost, setSelectedPost] = useState<string>('teacher');
   const [form] = Form.useForm();
+
+  // 编辑自己或内置系统管理员时锁定职位/权限字段（须在 editingUser 声明后定义）
+  const isProtectedEdit =
+    (!!editingUser && editingUser?.id === currentUser?.id) ||
+    editingUser?.loginname === 'sysadmin';
 
   useEffect(() => {
     getOrganizationTree()
@@ -326,7 +326,11 @@ const UserPage: React.FC = () => {
       };
       if (editingUser) {
         await updateUser(editingUser.id, payload);
-        message.success('更新成功');
+        message.success(
+          isSelfOrSysadminEdit
+            ? '已保存（职位与权限不允许修改）'
+            : '更新成功',
+        );
       } else {
         await createUser(payload as any);
         message.success('创建成功，初始密码为 123456');

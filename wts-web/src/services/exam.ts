@@ -44,6 +44,7 @@ export async function getSubjects(params?: {
   typeid?: string;
   tiptype?: string;
   pstate?: string;
+  orgId?: string;
 }) {
   return request.get('/subjects', { params });
 }
