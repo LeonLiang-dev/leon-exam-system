@@ -176,6 +176,10 @@ class AllApiControllerSmokeTest {
     void organizationEndpointsAreCallable() {
         OrganizationController controller = new OrganizationController(organizationService, permissionService, currentUserProvider);
         LoginUserDetails loginUser = loginUser("admin-1", "admin", "Admin One", "1");
+        loginUser.setPost("platform_admin");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(loginUser, null, List.of())
+        );
 
         when(permissionService.visibleOrgIds(any())).thenReturn(null);
         when(organizationService.getOrgTree(any())).thenReturn(List.of());
@@ -183,9 +187,9 @@ class AllApiControllerSmokeTest {
         when(organizationService.updateOrganization(eq("org-1"), any(SysOrganization.class), eq("admin-1"))).thenReturn(new SysOrganization());
 
         assertOk(controller.getTree());
-        assertOk(controller.create(new SysOrganization(), loginUser));
-        assertOk(controller.update("org-1", new SysOrganization(), loginUser));
-        assertOk(controller.delete("org-1", loginUser));
+        assertOk(controller.create(new SysOrganization()));
+        assertOk(controller.update("org-1", new SysOrganization()));
+        assertOk(controller.delete("org-1"));
     }
 
     @Test

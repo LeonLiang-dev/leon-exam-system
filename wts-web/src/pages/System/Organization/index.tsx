@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { App, Card, Tree, Button, Modal, Form, Input, InputNumber, Select, Space, Spin, Popconfirm, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
-import { history } from '@umijs/max';
+import { history, useModel } from '@umijs/max';
 import {
   getOrganizationTree,
   createOrganization,
@@ -20,6 +20,10 @@ interface OrgNode {
 
 const OrganizationPage: React.FC = () => {
   const { message } = App.useApp();
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const isPlatformAdmin =
+    currentUser?.post === 'platform_admin' || (currentUser?.type === '3' && !currentUser?.post);
   const [treeData, setTreeData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedNode, setSelectedNode] = useState<OrgNode | null>(null);
@@ -109,14 +113,16 @@ const OrganizationPage: React.FC = () => {
         title="组织机构"
         style={{ width: 400, minHeight: 600 }}
         extra={
-          <Button
-            type="primary"
-            size="small"
-            icon={<PlusOutlined />}
-            onClick={() => handleAdd()}
-          >
-            新建根组织
-          </Button>
+          isPlatformAdmin && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={() => handleAdd()}
+            >
+              新建根组织
+            </Button>
+          )
         }
       >
         <Spin spinning={loading}>
@@ -171,20 +177,24 @@ const OrganizationPage: React.FC = () => {
               >
                 查看用户
               </Button>
-              <Button
-                icon={<PlusOutlined />}
-                onClick={() => handleAdd(selectedNode.id)}
-              >
-                添加子组织
-              </Button>
-              <Button icon={<EditOutlined />} onClick={handleEdit}>
-                编辑
-              </Button>
-              <Popconfirm title="确定删除此组织？" onConfirm={handleDelete}>
-                <Button danger icon={<DeleteOutlined />}>
-                  删除
-                </Button>
-              </Popconfirm>
+              {isPlatformAdmin && (
+                <>
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => handleAdd(selectedNode.id)}
+                  >
+                    添加子组织
+                  </Button>
+                  <Button icon={<EditOutlined />} onClick={handleEdit}>
+                    编辑
+                  </Button>
+                  <Popconfirm title="确定删除此组织？" onConfirm={handleDelete}>
+                    <Button danger icon={<DeleteOutlined />}>
+                      删除
+                    </Button>
+                  </Popconfirm>
+                </>
+              )}
             </Space>
           </div>
         ) : (
