@@ -85,7 +85,12 @@ public class PermissionService {
         if (!StringUtils.hasText(perms)) {
             return new HashSet<>();
         }
-        return Set.of(perms.split(","));
+        // 兼容历史脏数据：权限串可能包含重复项（如主任账号 USER_MANAGE 重复出现），
+        // 不能直接用 Set.of（重复元素抛异常），去重后再装入 Set
+        return java.util.Arrays.stream(perms.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
     }
 
     /** 校验当前操作是否有指定权限，无则抛 403 */

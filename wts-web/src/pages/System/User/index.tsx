@@ -327,12 +327,14 @@ const UserPage: React.FC = () => {
               perms:
                 values.post === 'platform_admin'
                   ? ''
-                  : [
-                      ...(values.post === 'director' || values.post === 'deputy'
-                        ? ['USER_MANAGE']
-                        : []),
-                      ...(values.perms || []),
-                    ].join(','),
+                  : Array.from(
+                      new Set([
+                        ...(values.post === 'director' || values.post === 'deputy'
+                          ? ['USER_MANAGE']
+                          : []),
+                        ...(values.perms || []),
+                      ]),
+                    ).join(','),
             }),
       };
       if (editingUser) {
